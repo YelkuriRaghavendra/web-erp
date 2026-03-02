@@ -1,0 +1,218 @@
+export interface Contractor {
+  id: string;
+  nombre: string;
+  compania: string; // company providing the contract
+  cliente: string; // client company
+  contratista?: string; // contractor (third party/contracting company)
+  proyecto?: string; // project or faena
+  faena: string;
+  inicio: string;
+  finaliza: string;
+  estado?: string; // e.g. 'Activo' | 'Finalizado' | 'Pendiente'
+  tipoContrato?: string;
+  licencias?: number;
+  isActive?: boolean;
+}
+
+export const mockContractors: Contractor[] = [
+  {
+    id: '1',
+    nombre: 'Seffer-TechSolutions',
+    compania: 'Tech Solutions',
+    cliente: 'Tech Solutions',
+    contratista: 'Codelco',
+    proyecto: 'El Teniente, Rancagua',
+    faena: 'El Teniente, Rancagua',
+    inicio: '20/02/2025',
+    finaliza: '20/09/2025',
+    estado: 'Finalizado',
+  },
+  {
+    id: '2',
+    nombre: 'Chek-GlobalInnov-001',
+    compania: 'Global Innovations Ltd.',
+    contratista: 'Antofagasta Minerals',
+    cliente: 'Global Innovations Ltd.',
+    proyecto: 'Centinela Antofagasta',
+    faena: 'Centinela Antofagasta',
+    inicio: '18/09/2024',
+    finaliza: '18/08/2025',
+    estado: 'Finalizado',
+  },
+  {
+    id: '3',
+    nombre: 'Fix-Pioneer-002',
+    compania: 'Pioneer Enterprises',
+    contratista: 'BHP',
+    cliente: 'Pioneer Enterprises',
+    proyecto: 'Escondida Antofagasta',
+    faena: 'Escondida Antofagasta',
+    inicio: '02/04/2025',
+    finaliza: '02/08/2025',
+    estado: 'Finalizado',
+  },
+  {
+    id: '4',
+    nombre: 'Contrato Summit Group 003',
+    compania: 'Summit Group',
+    contratista: 'SQM / Codelco',
+    cliente: 'Summit Group',
+    proyecto: 'Salar de Atacama Antofagasta',
+    faena: 'Salar de Atacama Antofagasta',
+    inicio: '06/06/2025',
+    finaliza: '06/08/2025',
+    estado: 'Finalizado',
+  },
+  {
+    id: '5',
+    nombre: 'Contrato Zenith 005',
+    compania: 'Zenith Technologies',
+    cliente: 'Zenith Technologies',
+    contratista: 'Anglo American',
+    proyecto: 'Los Bronces Metropolitana',
+    faena: 'Los Bronces Metropolitana',
+    inicio: '06/10/2026',
+    finaliza: '06/10/2027',
+    estado: 'Activo',
+  },
+  {
+    id: '6',
+    nombre: 'Contrato Antofagasta Mineral 002',
+    compania: 'Antofagasta Minerals',
+    cliente: 'Antofagasta Minerals',
+    contratista: 'Antofagasta Minerals',
+    proyecto: 'Artlucaya Antofagasta',
+    faena: 'Artlucaya Antofagasta',
+    inicio: '14/10/2026',
+    finaliza: '14/12/2027',
+    estado: 'Activo',
+  },
+  {
+    id: '7',
+    nombre: 'Contrato Zenith 003',
+    compania: 'Zenith Technologies',
+    cliente: 'Zenith Technologies',
+    contratista: 'Anglo American',
+    proyecto: 'Collahuasi JV Tarapacá',
+    faena: 'Collahuasi JV Tarapacá',
+    inicio: '26/12/2026',
+    finaliza: '26/12/2027',
+    estado: 'Activo',
+  },
+  {
+    id: '8',
+    nombre: 'Minera Atacama Norte S.A.',
+    compania: 'Minera Atacama Norte',
+    cliente: 'Minera Atacama Norte',
+    contratista: 'Codelco',
+    proyecto: 'División Norte Chuquicamata',
+    faena: 'División Norte Chuquicamata',
+    inicio: '15/03/2025',
+    finaliza: '15/03/2026',
+    estado: 'Finalizado',
+  },
+  {
+    id: '9',
+    nombre: 'Servicios Mineros Sur Ltda.',
+    compania: 'Servicios Mineros Sur',
+    cliente: 'Servicios Mineros Sur',
+    contratista: 'Antofagasta Minerals',
+    proyecto: 'Zaldivar Antofagasta',
+    faena: 'Zaldivar Antofagasta',
+    inicio: '22/07/2025',
+    finaliza: '22/07/2026',
+    estado: 'Finalizado',
+  },
+  {
+    id: '10',
+    nombre: 'Constructora Andina SpA',
+    compania: 'Constructora Andina',
+    cliente: 'Constructora Andina',
+    contratista: 'BHP',
+    proyecto: 'Cerro Colorado Tarapacá',
+    faena: 'Cerro Colorado Tarapacá',
+    inicio: '08/11/2025',
+    finaliza: '08/11/2026',
+    estado: 'Activo',
+  },
+  {
+    id: '11',
+    nombre: 'Tecnología Minera Verde S.A.',
+    compania: 'Tecnología Minera Verde',
+    cliente: 'Tecnología Minera Verde',
+    contratista: 'SQM',
+    proyecto: 'Salar del Carmen Atacama',
+    faena: 'Salar del Carmen Atacama',
+    inicio: '14/01/2026',
+    finaliza: '14/01/2027',
+    estado: 'Activo',
+  },
+  {
+    id: '12',
+    nombre: 'Innovaciones Cobre Chile Ltda.',
+    compania: 'Innovaciones Cobre Chile',
+    cliente: 'Innovaciones Cobre Chile',
+    contratista: 'Codelco',
+    proyecto: 'El Salvador Atacama',
+    faena: 'El Salvador Atacama',
+    inicio: '03/05/2026',
+    finaliza: '03/05/2027',
+    estado: 'Activo',
+  },
+  {
+    id: '13',
+    nombre: 'Logística Minera del Norte S.A.',
+    compania: 'Logística Minera del Norte',
+    cliente: 'Logística Minera del Norte',
+    contratista: 'Anglo American',
+    proyecto: 'Mantoverde Atacama',
+    faena: 'Mantoverde Atacama',
+    inicio: '17/08/2026',
+    finaliza: '17/08/2027',
+    estado: 'Activo',
+  },
+  {
+    id: '14',
+    nombre: 'Equipos y Servicios Mineros SpA',
+    compania: 'Equipos y Servicios Mineros',
+    cliente: 'Equipos y Servicios Mineros',
+    contratista: 'Antofagasta Minerals',
+    proyecto: 'Michilla Antofagasta',
+    faena: 'Michilla Antofagasta',
+    inicio: '29/10/2026',
+    finaliza: '29/10/2027',
+    estado: 'Activo',
+  },
+  {
+    id: '15',
+    nombre: 'Soluciones Técnicas Mineras Ltda.',
+    compania: 'Soluciones Técnicas Mineras',
+    cliente: 'Soluciones Técnicas Mineras',
+    contratista: 'BHP',
+    proyecto: 'Spence Antofagasta',
+    faena: 'Spence Antofagasta',
+    inicio: '12/12/2026',
+    finaliza: '12/12/2027',
+    estado: 'Activo',
+  },
+  {
+    id: '16',
+    nombre: 'Consultoría Minera Especializada S.A.',
+    compania: 'Consultoría Minera Especializada',
+    cliente: 'Consultoría Minera Especializada',
+    contratista: 'Codelco',
+    proyecto: 'Radomiro Tomic Antofagasta',
+    faena: 'Radomiro Tomic Antofagasta',
+    inicio: '25/02/2027',
+    finaliza: '25/02/2028',
+    estado: 'Activo',
+  },
+];
+
+export const getContractors = (): Contractor[] => {
+  return mockContractors;
+};
+
+export const getContractorById = (id: string): Contractor | undefined => {
+  return mockContractors.find(contractor => contractor.id === id);
+};

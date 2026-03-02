@@ -1,0 +1,18 @@
+{
+  "name": "context-as-env",
+  "version": "0.0.1",
+  "description": "This action will process vars and secret contexts then will set them as env vars.",
+  "main": "dist/context-as-env/index.js",
+  "scripts": {
+    "build": "tsc",
+    "release": "ncc build src/index.ts -o dist/context-as-env"
+  },
+  "dependencies": {
+    "@actions/core": "^1.10.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.18",
+    "@vercel/ncc": "^0.38.1",
+    "typescript": "^5.3.3"
+  }
+}

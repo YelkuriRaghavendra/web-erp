@@ -1,0 +1,852 @@
+{
+  "common": {
+    "back": "Volver",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "saving": "Guardando...",
+    "create": "Crear",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "continue": "Continuar",
+    "sortBy": "Ordenar por",
+    "retry": "Reintentar"
+  },
+  "sidebar": {
+    "sections": {
+      "general": "General",
+      "account": "Cuenta"
+    },
+    "navigation": {
+      "erp": "ERP",
+      "dashboard": "Panel de Control",
+      "companies": "Companías",
+      "contracts": "Contratos",
+      "users": "Usuarios y perfiles",
+      "subscriptions": "Suscripciones y licencias",
+      "audit": "Auditoría",
+      "notifications": "Notificaciones",
+      "settings": "Configuración del sistema",
+      "logout": "Cerrar sesión",
+      "projects": "Proyecto / Faenas y turnos"
+    }
+  },
+  "filters": {
+    "title": "Filtros",
+    "applied": "Filtros aplicados",
+    "companyType": "Tipo de compañía",
+    "projectType": "Tipo de proyecto",
+    "projects": "Proyectos",
+    "parentCompany": "Compañía padre",
+    "country": "País",
+    "location": "Ubicación",
+    "types": {
+      "holding": "Holding",
+      "division": "División",
+      "subsidiary": "Subsidiaria"
+    },
+    "buttons": {
+      "apply": "Aplicar filtros",
+      "clear": "Limpiar filtros"
+    }
+  },
+  "sort": {
+    "nameAsc": "Nombre (A-Z)",
+    "nameDesc": "Nombre (Z-A)"
+  },
+  "loginform": {
+    "email": "Ingresa tu correo",
+    "password": "Ingrese su Contraseña",
+    "emailPlaceholder": "email@serhafen.com",
+    "passwordPlaceholder": "Tu Contraseña",
+    "title": "Bienvenido de nuevo",
+    "subtitle": "Inicia sesión para continuar en serhafen",
+    "getInto": "Iniciar sesión",
+    "forgotpassword": "¿Olvidaste tu contraseña?",
+    "login": "Ingresar"
+  },
+  "company": {
+    "title": {
+      "companies": "Compañías"
+    }
+  },
+  "createCompany": {
+    "title": "Crear nueva compañía",
+    "companyInformation": "Información de la compañía",
+    "companyName": "Nombre de la compañía",
+    "enterName": "Ingresa el nombre de la compañía",
+    "brandName": "Razón social",
+    "enterBrandName": "Ingresa la razón social",
+    "uniqueId": "RUT de la compañía",
+    "enterUniqueId": "Ingresa el ID único",
+    "typeOfCompany": "Tipo de compañía",
+    "selectType": "Selecciona un tipo",
+    "parentCompany": "Matriz",
+    "selectParent": "Selecciona matriz de la compañía",
+    "country": "País",
+    "selectCountry": "Selecciona un país",
+    "address": "Dirección",
+    "enterAddress": "Ingresa la dirección",
+    "companyLogo": "Logotipo de la compañía",
+    "logoHelp": "Sube el logotipo de la compañía. Formatos: PNG, JPG, SVG",
+    "logoSelected": "Archivo seleccionado correctamente",
+    "replaceLogo": "Reemplazar archivo",
+    "dragDropLogo": "Arrastra los archivos aquí o haz clic para seleccionar",
+    "logoFormats": "PNG, JPG o SVG (máx. 2MB)",
+    "additionalHelp": "Selecciona un archivo",
+    "contactInformation": "Datos de contacto",
+    "contactsTitle": "Contactos de la compañía",
+    "contactName": "Nombre y apellido",
+    "contactType": "Tipo de contacto",
+    "selectContactType": "Selecciona el tipo de contacto",
+    "addMoreContacts": "Agregar más contactos",
+    "contactsInfo": "Puedes agregar hasta 3 contactos para diferentes áreas de la compañía",
+    "nameAndSurname": "Nombre y apellido",
+    "enterFullName": "Ingresa nombre completo",
+    "phoneNumber": "Número de teléfono",
+    "enterPhone": "Ingresa un número de teléfono",
+    "email": "Correo electrónico",
+    "enterEmail": "Ingresa un correo electrónico",
+    "errors": {
+      "createCompanyFailed": "Error al crear la compañía",
+      "userIdRequiredForAllCompanies": "El ID de usuario es requerido para obtener todas las compañías"
+    },
+    "buttons": {
+      "create": "Crear compañía",
+      "creating": "Creando...",
+      "cancel": "Cancelar",
+      "continue": "Continuar"
+    }
+  },
+  "viewCompany": {
+    "title": "Información de la compañía",
+    "back": "Volver",
+    "notFound": "Compañía no encontrada",
+    "notAvailable": "No disponible",
+    "companyInformation": "Información de la compañía",
+    "companyName": "Nombre de la compañía",
+    "companyLogo": "Logotipo de la compañía",
+    "noLogo": "No hay logotipo disponible",
+    "legalName": "Razón social",
+    "taxId": "RUT de la compañía",
+    "typeOfCompany": "Tipo de compañía",
+    "parentCompany": "Matriz",
+    "country": "País",
+    "address": "Dirección de la compañía",
+    "companyContacts": "Contactos de la compañía",
+    "contactName": "Nombre del contacto",
+    "contactType": "Tipo de contacto",
+    "contactPhone": "Número de teléfono del contacto",
+    "contactEmail": "Correo electrónico del contacto",
+    "noContacts": "No hay contactos registrados",
+    "administrators": "Administradores",
+    "buttons": {
+      "edit": "Editar",
+      "cancel": "Cancelar"
+    },
+    "errors": {
+      "userIdRequiredForParentCompanies": "El ID de usuario es requerido para obtener las compañías padre",
+      "fetchParentCompaniesFailed": "Error al cargar compañías padre",
+      "userIdRequiredForClientCompanies": "El ID de usuario es requerido para obtener las compañías cliente",
+      "fetchClientCompaniesFailed": "Error al cargar compañías cliente",
+      "userIdRequiredForContractorCompanies": "El ID de usuario es requerido para obtener las compañías contratistas",
+      "fetchContractorCompaniesFailed": "Error al cargar compañías contratistas",
+      "userIdRequiredForSites": "El ID de usuario es requerido para obtener faenas",
+      "fetchSitesFailed": "Error al cargar faenas",
+      "userIdRequiredForOfferings": "El ID de usuario es requerido para obtener las ofertas",
+      "fetchOfferingsFailed": "Error al cargar las ofertas",
+      "loadClientCompanies": "Error al cargar las compañías cliente:",
+      "fetchCompaniesFailed": "Error al cargar compañías",
+      "searchClientCompanies": "Error al buscar compañías cliente:",
+      "loadContractorCompanies": "Error al cargar las compañías contratistas:",
+      "searchContractorCompanies": "Error al buscar compañías contratistas:",
+      "loadSites": "Error al cargar faenas:",
+      "searchSites": "Error al buscar faenas:",
+      "loadCompanies": "Error cargando compañías:"
+    }
+  },
+  "editCompany": {
+    "title": "Editar información de la compañía",
+    "companyInformation": "Información de la compañía",
+    "companyName": "Nombre de la compañía",
+    "enterName": "Ingresa el nombre de la compañía",
+    "typeOfCompany": "Tipo de compañía",
+    "selectType": "Selecciona un tipo",
+    "country": "País",
+    "selectCountry": "Selecciona un país",
+    "address": "Dirección",
+    "enterAddress": "Ingresa la dirección",
+    "contactInformation": "Datos de contacto",
+    "nameAndSurname": "Nombre y apellido",
+    "enterFullName": "Ingresa nombre completo",
+    "phoneNumber": "Número de teléfono",
+    "enterPhone": "Ingresa un número de teléfono",
+    "email": "Correo electrónico",
+    "enterEmail": "Ingresa un correo electrónico",
+    "companyNotFound": "Compañía no encontrada",
+    "successMessage": "Tus cambios han sido guardados exitosamente. Puedes cerrar esta ventana",
+    "confirmDialog": {
+      "title": "¿Estás seguro que quieres guardar estos cambios?",
+      "description": "Para finalizar, haz clic en Guardar o puedes cancelar si quieres seguir editando."
+    },
+    "buttons": {
+      "save": "Guardar",
+      "saving": "Guardando...",
+      "cancel": "Cancelar"
+    },
+    "errors": {
+      "updateCompanyFailed": "Error al actualizar la compañía",
+      "deleteCompanyFailed": "Error al eliminar la compañía",
+      "companyUpdateSuccess": "Compañías actualizadas exitosamente",
+      "companyUpdateError": "Error al actualizar las compañías"
+    }
+  },
+  "createContractor": {
+    "title": "Crear un contrato",
+    "contractInformation": "Información del contrato",
+    "contractName": "Nombre del contrato",
+    "contractor": "Contratista",
+    "selectContractType": "Selecciona tipo de contrato",
+    "selectContractor": "Selecciona contratista",
+    "searchContractors": "Buscar contratistas...",
+    "enterName": "Ingresa el nombre del contrato",
+    "company": "Compañía",
+    "selectCompany": "Seleccionar compañía",
+    "client": "Cliente",
+    "searchSites": "Buscar faenas...",
+    "selectClient": "Selecciona cliente",
+    "mine": "Faena",
+    "selectMine": "Select faena",
+    "searchCustomers": "Buscar clientes...",
+    "contractType": "Tipo de contrato",
+    "enterContractType": "Enter a Lorem Ipsum",
+    "licenses": "Licencias",
+    "enterLicenses": "Ingresa número de licencias",
+    "startDate": "Inicio del contrato",
+    "selectStartDate": "Selecciona fecha",
+    "endDate": "Fin del contrato",
+    "selectEndDate": "Selecciona fecha",
+    "buttons": {
+      "create": "Crear",
+      "cancel": "Cancelar",
+      "back": "Volver"
+    },
+    "errors": {
+      "createContractFailed": "Error al crear el contrato"
+    }
+  },
+  "editContractor": {
+    "title": "Editar contrato",
+    "contractInformation": "Información del contrato",
+    "contractName": "Nombre del contrato",
+    "enterName": "Ingresa el nombre del contrato",
+    "company": "Compañía",
+    "client": "Cliente",
+    "mine": "Faena",
+    "contractType": "Tipo de contrato",
+    "enterContractType": "Enter a Lorem Ipsum",
+    "licenses": "Número de licencias",
+    "enterLicenses": "Ingresa número de licencias",
+    "startDate": "Fecha de inicio",
+    "selectStartDate": "Selecciona fecha de inicio",
+    "endDate": "Fecha de finalización",
+    "selectEndDate": "Selecciona fecha de finalización",
+    "activateContract": "Activar/desactivar contrato",
+    "buttons": {
+      "save": "Guardar",
+      "cancel": "Cancelar"
+    }
+  },
+  "validation": {
+    "login": {
+      "emailInvalid": "Ingresa un correo electrónico válido",
+      "emailDomain": "Solo se permiten correos con el dominio @serhafen.com",
+      "passwordMin": "La contraseña debe tener al menos 6 caracteres"
+    },
+    "contract": {
+      "nameMin": "El nombre debe tener al menos 3 caracteres",
+      "clientRequired": "Selecciona un cliente",
+      "contractorRequired": "Selecciona un contratista",
+      "siteRequired": "Selecciona una faena",
+      "typeRequired": "Ingresa el tipo de contrato",
+      "startDateRequired": "Selecciona la fecha de inicio",
+      "endDateRequired": "Selecciona la fecha de finalización",
+      "endDateAfterStart": "La fecha de finalización debe ser posterior a la fecha de inicio"
+    },
+    "companyName": {
+      "min": "El nombre debe tener al menos 3 caracteres",
+      "max": "El nombre no puede tener más de 100 caracteres"
+    },
+    "brandName": {
+      "min": "La marca debe tener al menos 3 caracteres",
+      "max": "La marca no puede tener más de 30 caracteres"
+    },
+    "uniqueId": {
+      "min": "El ID único debe tener al menos 3 caracteres",
+      "max": "El ID único no puede tener más de 10 caracteres",
+      "regex": "El ID único solo puede contener números y guiones"
+    },
+    "country": {
+      "required": "Selecciona un país"
+    },
+    "address": {
+      "min": "La dirección debe tener al menos 10 caracteres",
+      "max": "La dirección no puede tener más de 100 caracteres"
+    },
+    "contact": {
+      "nameMin": "El nombre debe tener al menos 2 caracteres",
+      "nameMax": "El nombre no puede tener más de 100 caracteres",
+      "nameRegex": "El nombre solo puede contener letras, números y espacios",
+      "typeRequired": "Selecciona un tipo de contacto",
+      "emailInvalid": "Ingresa un correo electrónico válido",
+      "emailMax": "El correo electrónico no puede tener más de 50 caracteres",
+      "phoneMin": "El teléfono debe tener al menos 10 dígitos",
+      "phoneMax": "El teléfono no puede tener más de 10 dígitos",
+      "phoneRegex": "El teléfono solo puede contener números"
+    },
+    "userRole": {
+      "roleRequired": "Selecciona un rol",
+      "companyRequired": "Selecciona una compañía",
+      "contractRequired": "Selecciona un tipo de contrato",
+      "shiftRequired": "Selecciona un turno",
+      "supervisorRequired": "Selecciona un jefe",
+      "profileMin": "El perfil debe tener al menos 2 caracteres",
+      "profileMax": "El perfil no puede tener más de 200 caracteres",
+      "phoneMin": "El teléfono debe tener al menos 9 dígitos",
+      "phoneMax": "El teléfono no puede tener más de 20 dígitos"
+    },
+    "user": {
+      "nameMin": "El nombre debe tener al menos 3 caracteres",
+      "nameMax": "El nombre no puede tener más de 100 caracteres",
+      "rutMin": "El RUT debe tener al menos 3 caracteres",
+      "rutMax": "El RUT no puede tener más de 12 caracteres",
+      "rutInvalidChars": "El RUT solo puede contener números y guiones",
+      "emailInvalid": "Ingresa un correo electrónico válido",
+      "emailMax": "El correo electrónico no puede tener más de 100 caracteres",
+      "phoneMin": "El teléfono debe tener al menos 9 dígitos",
+      "phoneMax": "El teléfono no puede tener más de 20 dígitos",
+      "photoMaxSize": "La foto no debe ser mayor a 2 MB",
+      "photoInvalidType": "Solo se aceptan archivos JPG, PNG o SVG",
+      "positionMin": "El cargo debe tener al menos 2 caracteres",
+      "positionMax": "El cargo no puede tener más de 100 caracteres",
+      "joinDateRequired": "Selecciona la fecha de contratación",
+      "companiesMin": "Debes tener al menos una compañía asignada",
+      "companiesMax": "Puedes tener máximo 5 compañías asignadas"
+    },
+    "account": {
+      "passwordRequirements": "Al menos 8 caracteres, 1 mayúscula, 1 número",
+      "passwordMismatch": "Las contraseñas no coinciden"
+    },
+    "project": {
+      "nameMin": "El nombre debe tener al menos 3 caracteres",
+      "nameMax": "El nombre no puede tener más de 100 caracteres",
+      "countryRequired": "Selecciona un país",
+      "locationMin": "La ubicación debe tener al menos 2 caracteres",
+      "addressMin": "La dirección debe tener al menos 10 caracteres",
+      "addressMax": "La dirección no puede tener más de 100 caracteres",
+      "timeZoneRequired": "Selecciona una zona horaria",
+      "typeInvalid": "Selecciona un tipo válido (ÁREA o FAENA)",
+      "latitudeRequired": "La latitud es requerida",
+      "longitudeRequired": "La longitud es requerida"
+    }
+  },
+  "viewContractor": {
+    "title": "Información del contrato",
+    "loading": "Cargando contrato...",
+    "buttons": {
+      "cancel": "Volver",
+      "edit": "Editar"
+    },
+    "errors": {
+      "fetchContractsFailed": "Error al cargar los contratos",
+      "userIdRequiredForContracts": "El ID de usuario es requerido para obtener los contratos"
+    }
+  },
+  "contractors": {
+    "title": "Contratos",
+    "searchPlaceholder": "Buscar contratos...",
+    "createButton": "Crear un contrato",
+    "finalizedButton": "Contratos finalizados",
+    "export": "Exportar",
+    "exportCsv": "Exportar CSV",
+    "exportPdf": "Exportar PDF",
+    "table": {
+      "headers": {
+        "name": "Nombre",
+        "company": "Compañía",
+        "client": "Cliente",
+        "mine": "Faena",
+        "start": "Inicio",
+        "end": "Finaliza"
+      },
+      "statusLabel": "Estado",
+      "status": {
+        "active": "Activo",
+        "inactive": "Inactivo",
+        "expired": "Expirado",
+        "finished": "Finalizado",
+        "scheduled": "Programado",
+        "pending": "Pendiente"
+      },
+      "actions": {
+        "view": "Ver contrato",
+        "edit": "Editar contrato",
+        "finalize": "Finalizar contrato",
+        "delete": "Eliminar contrato"
+      },
+      "errors": {
+        "updateContractFailed": "Error al actualizar el contrato",
+        "deleteContractFailed": "Error al eliminar el contrato"
+      }
+    },
+    "loading": "Cargando contratos...",
+    "deleteDialog": {
+      "title": "Eliminar contrato",
+      "description": "¿Estás seguro de que deseas eliminar este contrato?",
+      "cancel": "Cancelar",
+      "confirm": "Eliminar"
+    }
+  },
+  "projects": {
+    "title": "Proyectos y Faenas",
+    "errorloadingProjects": "Error al cargar los proyectos",
+    "searchPlaceholder": "Buscar en serhafen Admin",
+    "createButton": "Crear nuevo proyecto",
+    "filter": "Filtrar",
+    "sort": {
+      "nameAsc": "Nombre (A-Z)",
+      "nameDesc": "Nombre (Z-A)"
+    },
+    "export": "Exportar",
+    "exportCsv": "Exportar CSV",
+    "table": {
+      "name": "Proyecto/Faena",
+      "country": "País",
+      "address": "Dirección",
+      "type": "Tipo"
+    },
+    "actions": {
+      "edit": "Editar proyecto",
+      "delete": "Eliminar proyecto"
+    },
+    "deleteDialog": {
+      "title": "Eliminar proyecto/faena",
+      "description": "¿Estás seguro de que deseas eliminar este proyecto/faena?",
+      "cancel": "Cancelar",
+      "confirm": "Eliminar"
+    }
+  },
+  "subscriptions": {
+    "title": "Suscripciones y licencias",
+    "searchPlaceholder": "Buscar en serhafen Admin",
+    "createButton": "Crear suscripción",
+    "export": "Exportar",
+    "exportCsv": "Exportar CSV",
+    "table": {
+      "name": "Nombre de la suscripción",
+      "company": "Compañía",
+      "offering": "Oferta",
+      "startDate": "Fecha de inicio",
+      "endDate": "Fecha de finalización",
+      "availableLicenses": "Available Licenses",
+      "licenseCount": "Número de licencias",
+      "price": "Precio",
+      "update": "Actualizar",
+      "status": "Estado"
+    },
+    "actions": {
+      "view": "Ver suscripción",
+      "edit": "Editar suscripción",
+      "delete": "Eliminar suscripción"
+    },
+    "deleteDialog": {
+      "title": "Eliminar suscripción",
+      "description": "¿Estás seguro de que deseas eliminar esta suscripción?",
+      "cancel": "Cancelar",
+      "confirm": "Eliminar"
+    }
+  },
+  "createSubscription": {
+    "title": "Crear suscripción",
+    "subscriptionInformation": "Información de la suscripción",
+    "subscriptionName": "Nombre de la suscripción",
+    "enterName": "Ingresa el nombre de la suscripción",
+    "company": "Compañía",
+    "selectCompany": "Selecciona una compañía",
+    "offering": "Oferta",
+    "selectOffering": "Selecciona una oferta",
+    "licenseCount": "Número de licencias",
+    "enterLicenses": "Ingresa el número de licencias",
+    "price": "Precio",
+    "enterPrice": "Ingresa el precio",
+    "startDate": "Fecha de inicio",
+    "selectStartDate": "Selecciona la fecha de inicio",
+    "endDate": "Fecha de finalización",
+    "selectEndDate": "Selecciona la fecha de finalización",
+    "buttons": {
+      "create": "Crear",
+      "cancel": "Cancelar"
+    },
+    "errors": {
+      "createSubscriptionFailed": "Error al crear la suscripción"
+    }
+  },
+  "editSubscription": {
+    "title": "Editar suscripción",
+    "buttons": {
+      "update": "Actualizar",
+      "cancel": "Cancelar"
+    },
+    "errors": {
+      "updateSubscriptionFailed": "Error al actualizar la suscripción",
+      "deleteSubscriptionFailed": "Error al eliminar la suscripción"
+    }
+  },
+  "createProject": {
+    "title": "Crear nuevo proyecto/faena",
+    "projectInformation": "Información del proyecto",
+    "projectName": "Nombre del proyecto",
+    "enterName": "Ingresa el nombre del proyecto",
+    "projectType": "Tipo de proyecto",
+    "enterProjectType": "Ingresa un tipo de proyecto",
+    "country": "País",
+    "selectCountry": "Selecciona un país",
+    "location": "Ubicación",
+    "enterLocation": "Ingresa la ubicación",
+    "latitude": "Latitud",
+    "enterLatitude": "Ingresa la latitud",
+    "longitude": "Longitud",
+    "enterLongitude": "Ingresa la longitud",
+    "address": "Dirección",
+    "enterAddress": "Ingresa la dirección",
+    "AREA": "ÁREA",
+    "SITE": "FAENA",
+    "buttons": {
+      "create": "Crear",
+      "cancel": "Cancelar"
+    },
+    "errors": {
+      "createProjectFailed": "Error al crear el proyecto"
+    }
+  },
+  "editProject": {
+    "title": "Editar Proyecto/Faena",
+    "projectName": "Nombre del proyecto",
+    "enterName": "Ingresa el nombre del proyecto",
+    "country": "País",
+    "selectCountry": "Selecciona un país",
+    "location": "Ubicación",
+    "enterLocation": "Ingresa la ubicación",
+    "address": "Dirección",
+    "enterAddress": "Ingresa la dirección",
+    "latitude": "Latitud",
+    "enterLatitude": "Ingresa la latitud",
+    "longitude": "Longitud",
+    "enterLongitude": "Ingresa la longitud",
+    "timeZone": "Zona horaria",
+    "enterTimeZone": "Ingresa la zona horaria",
+    "projectType": "Tipo de proyecto",
+    "selectProjectType": "Selecciona un tipo de proyecto",
+    "buttons": {
+      "save": "Guardar",
+      "cancel": "Cancelar"
+    },
+    "errors": {
+      "updateProjectFailed": "Error al actualizar el proyecto",
+      "deleteProjectFailed": "Error al eliminar el proyecto"
+    }
+  },
+  "viewProject": {
+    "title": "Ver proyecto",
+    "projectName": "Nombre del proyecto",
+    "country": "País",
+    "location": "Ubicación",
+    "address": "Dirección",
+    "latitude": "Latitud",
+    "longitude": "Longitud",
+    "timeZone": "Zona horaria",
+    "projectType": "Tipo de proyecto",
+    "buttons": {
+      "edit": "Editar",
+      "cancel": "Volver"
+    },
+    "errors": {
+      "fetchProjectsFailed": "Error al cargar los proyectos"
+    }
+  },
+  "users": {
+    "title": "Usuario y perfiles",
+    "searchPlaceholder": "Busca en serhafen Admin",
+    "createButton": "Crear nuevo usuario",
+    "bulkUploadButton": "Carga masiva",
+    "filter": "Filtrar",
+    "sort": {
+      "nameAsc": "Nombre (A-Z)",
+      "nameDesc": "Nombre (Z-A)",
+      "roleAsc": "Rol (A-Z)",
+      "roleDesc": "Rol (Z-A)"
+    },
+    "export": "Exportar",
+    "exportCsv": "Exportar CSV",
+    "selection": {
+      "selectAll": "Seleccionar todo",
+      "selected": "{{count}} seleccionados",
+      "delete": "Eliminar",
+      "toggleStatus": "Activar"
+    },
+    "table": {
+      "name": "Nombre",
+      "rut": "RUT",
+      "role": "Rol",
+      "jobTitle": "Cargo",
+      "company": "Compañía",
+      "project": "Proyecto / Faena",
+      "lastAccess": "Último acceso",
+      "licenses": "Licencias",
+      "status": {
+        "active": "Activo",
+        "inactive": "Inactivo"
+      },
+      "statusLabel": "Estado"
+    },
+    "actions": {
+      "view": "Ver usuario",
+      "edit": "Editar usuario",
+      "assignLicense": "Asignar licencia",
+      "deactivate": "Desactivar usuario",
+      "delete": "Eliminar usuario"
+    },
+    "deleteDialog": {
+      "title": "Eliminar usuario",
+      "description": "¿Estás seguro de que deseas eliminar a {{name}}?",
+      "bulkDescription": "¿Estás seguro de que deseas\neliminar {{count}} usuarios?",
+      "cancel": "Cancelar",
+      "confirm": "Eliminar",
+      "deleting": "Eliminando..."
+    },
+    "bulkUpload": {
+      "title": "Carga masiva de usuarios",
+      "description": "Sube un CSV con los datos de los usuarios, la primera fila debe ser el encabezado y los valores separados por comas.",
+      "downloadTemplate": "Descargar plantilla CSV",
+      "templateDescription": "Usa esta plantilla para preparar tus datos",
+      "download": "Descargar",
+      "dragDrop": "Arrastra y suelta tu archivo CSV aquí",
+      "browse": "o haz clic para seleccionar",
+      "fileFormat": "Formato: CSV (máx. 5MB)",
+      "upload": "Cargar archivo"
+    }
+  },
+  "user": {
+    "settings": {
+      "cancelDialog": {
+        "title": "¿Estás seguro que quieres cancelar?",
+        "description": "Los cambios no guardados se perderán. ¿Quieres continuar?"
+      },
+      "editAndConfig": "Edición y configuración del usuario",
+      "editAssignedCompanies": "Editar compañías asignadas",
+      "userInfo": "Información del usuario",
+      "userInfoDesc": "En esta sección puedes editar información personal, actualizar contacto de emergencia.",
+      "companies": "Compañías",
+      "companiesDesc": "En esta sección podrás consultar datos de las compañías vinculadas al usuario, junto con la información de la jefatura correspondiente.",
+      "rolesAndLicenses": "Roles y licencias",
+      "rolesAndLicensesDesc": "Revisa y actualiza roles asignados y y turnos correspondientes, así como gestionar, reasignar o revocar licencias de aplicaciones.",
+      "deleteUser": "Eliminar usuario",
+      "deleteRoles": "Eliminar roles",
+      "accountConfiguration": "Configuración de la cuenta",
+      "accountStatus": "Activar/desactivar cuenta",
+      "toggleAccount": "Toggle account status",
+      "password": "Contraseña",
+      "lastUpdate": "Última actualización",
+      "changePassword": "Cambiar contraseña",
+      "lastAccesses": "Últimos accesos",
+      "date": "Fecha",
+      "time": "Hora",
+      "addMoreCompanies": "Add more companies",
+      "assignedCompanies": "Assigned companies",
+      "companiesInfo": "You can assign up to 5 companies to the user. The user must have at least 1 company assigned."
+    }
+  },
+  "updateUser": {
+    "errors": {
+      "updateUserPersonalDataFailed": "Error al actualizar los datos personales del usuario:",
+      "userUpdatePersonalDataError": "Error al actualizar los datos personales",
+      "userStatusUpdateSuccess": "Estado del usuario actualizado exitosamente",
+      "userStatusUpdateError": "Error al actualizar el estado del usuario",
+      "userDeletedSuccess": "Usuario eliminado exitosamente",
+      "userDeletedError": "Error al eliminar el usuario",
+      "rolesUpdateSuccess": "Roles actualizados exitosamente",
+      "rolesUpdateError": "Error al actualizar los roles"
+    }
+  },
+  "companiesList": {
+    "loading": "Cargando compañías...",
+    "actions": {
+      "view": "Ver compañía",
+      "edit": "Editar compañía",
+      "delete": "Eliminar compañía"
+    },
+    "deleteDialog": {
+      "title": "Eliminar compañía",
+      "description": "¿Estás seguro de que deseas\neliminar esta compañía?",
+      "cancel": "Cancelar",
+      "confirm": "Eliminar",
+      "deleting": "Eliminando..."
+    }
+  },
+  "accessDenied": {
+    "title": "Acceso Denegado",
+    "message": "No tienes permisos para acceder a este recurso",
+    "insufficientPermissions": "Permisos insuficientes",
+    "contactAdmin": "Contacta a tu administrador para obtener acceso",
+    "goBack": "Volver"
+  },
+  "settings": {
+    "title": "Configuración del sistema",
+    "subtitle": "Ajustes globales del panel de administración",
+    "reload": "Recargar",
+    "language": {
+      "title": "Idioma"
+    },
+    "general": {
+      "title": "Preferencias",
+      "description": "Aquí podrás encontrar futuras opciones para personalizar el comportamiento del panel."
+    }
+  },
+  "countrySelector": {
+    "searchPlaceholder": "Buscar país...",
+    "noCountriesFound": "No se encontraron países",
+    "selectCountry": "Selecciona un país"
+  },
+  "countries": {
+    "CL": "Chile",
+    "AR": "Argentina",
+    "BO": "Bolivia",
+    "BR": "Brasil",
+    "CO": "Colombia",
+    "EC": "Ecuador",
+    "PE": "Perú",
+    "UY": "Uruguay",
+    "VE": "Venezuela",
+    "MX": "México",
+    "US": "Estados Unidos"
+  },
+  "contracts": {
+    "permanent": "Indefinido",
+    "fixedTerm": "Plazo Fijo",
+    "temporary": "Temporal",
+    "freelance": "Freelance"
+  },
+  "shifts": {
+    "9x5": "Lunes a Viernes (9x5)",
+    "7x7Day": "7x7 Turno Día",
+    "7x7Night": "7x7 Turno Noche",
+    "rotating": "Turno Rotativo"
+  },
+  "navbar": {
+    "title": "Administrador central"
+  },
+  "mawb": {
+    "title": "Listado de MAWB",
+    "subtitle": "Lista de MAWBs subidos en la plataforma.",
+    "searchPlaceholder": "Buscar por número MAWB, código de cliente...",
+    "error": "Error al cargar MAWBs",
+    "errorUnknown": "Ocurrió un error desconocido",
+    "noResults": "No se encontraron MAWBs",
+    "noResultsDescription": "Intenta ajustar tus criterios de búsqueda",
+    "table": {
+      "mawbNumber": "Número MAWB",
+      "manifestNumber": "Número de Manifiesto",
+      "clientCode": "Código Cliente",
+      "destinationCountry": "Destino",
+      "customsType": "Tipo de Aduana",
+      "totalPackages": "Paquetes",
+      "totalWeight": "Peso",
+      "totalValue": "Valor",
+      "status": "Estado",
+      "createdAt": "Fecha de Creación",
+      "actions": "Acciones"
+    },
+    "actions":{
+      "view": "Vista",
+      "viewMawb": "Ver Mawb",
+      "editMawb":"Editar Mawb"
+    }
+  },
+  "createUser": {
+    "title": "Crear nuevo usuario",
+    "personalDataSubtitle": "Datos personales",
+    "companyDataSubtitle": "Datos de la compañía del usuario",
+    "rolesSubtitle": "Roles del usuario",
+    "supervisorDataSubtitle": "Datos de la jefatura",
+    "accountConfigSubtitle": "Configuración de la cuenta",
+    "previewSubtitle": "Revisar información",
+    "fullName": "Nombre y apellido",
+    "enterFullName": "Ej: Ramiro Orellana Lillo",
+    "rut": "RUT",
+    "enterRut": "Con punto y con guión. Ej: 10.574.908-0",
+    "rutPlaceholder": "RUT del usuario",
+    "email": "Correo",
+    "enterEmail": "Ej: ramiro.orellana@domain.com",
+    "phone": "Teléfono",
+    "enterPhone": "Ingresa un teléfono",
+    "company": "Compañía",
+    "selectCompany": "Selecciona una compañía",
+    "searchCompany": "Buscar compañías...",
+    "country": "País",
+    "selectCountry": "Selecciona el país",
+    "position": "Cargo",
+    "enterPosition": "Gerente de Operaciones",
+    "joinDate": "Fecha de contratación",
+    "selectJoinDate": "Seleccionar fecha",
+    "role": "Rol",
+    "selectRole": "Selecciona un rol",
+    "contract": "Contrato",
+    "selectContract": "Selecciona un contrato vigente",
+    "searchContract": "Buscar contratos...",
+    "shift": "Turno",
+    "selectShift": "Selecciona un turno",
+    "searchShift": "Buscar turnos...",
+    "supervisorName": "Nombre de la jefatura",
+    "selectSupervisor": "Selecciona la jefatura",
+    "searchSupervisor": "Buscar jefaturas...",
+    "supervisorPosition": "Cargo",
+    "positionPlaceholder": "Cargo de la jefatura",
+    "supervisorProfile": "Perfil",
+    "profilePlaceholder": "Perfil de la jefatura",
+    "supervisorEmail": "Correo",
+    "emailPlaceholder": "correo@ejemplo.com",
+    "supervisorPhone": "Teléfono",
+    "phonePlaceholder": "Teléfono de la jefatura",
+    "profile": "Perfil",
+    "photo": "Foto",
+    "uploadPhotoTitle": "Sube una foto de perfil",
+    "emergencyContactName": "Contacto de emergencia",
+    "emergencyContactPhone": "Teléfono de emergencia",
+    "accountConfigTitle": "Configuración de la cuenta",
+    "accountConfigDescription": "Configura la contraseña para el nuevo usuario",
+    "password": "Contraseña",
+    "enterPassword": "Ingresa una contraseña",
+    "confirmPassword": "Ingresar nuevamente la contraseña",
+    "confirmPasswordPlaceholder": "Confirma tu contraseña",
+    "passwordRequirements": "Requisitos de la contraseña",
+    "passwordMinChars": "Al menos 8 caracteres",
+    "passwordUppercase": "1 mayúscula",
+    "passwordNumber": "1 número",
+    "useTempPassword": "Usar contraseña temporal",
+    "tempPasswordActive": "Contraseña temporal generada",
+    "tempPasswordGenerated": "Contraseña temporal generada exitosamente",
+    "tempPasswordGenerationFailed": "Error al generar contraseña temporal",
+    "passwordCopied": "Contraseña copiada al portapapeles",
+    "copyPassword": "Copiar contraseña",
+    "createButton": "Crear usuario",
+    "searchParent": "Buscar matriz...",
+    "errors": {
+      "createUserFailed": "Error al crear el usuario:",
+      "userCreatedError": "Error al crear el usuario",
+      "userCreatedSuccess": "Usuario creado exitosamente",
+      "missingWizardData": "Faltan datos del asistente"
+    }
+  },
+  "adminUserScreen":{
+    "title":"No tienes los roles necesarios para acceder a esta aplicación. Contacta con el administrador de Serhafen para obtener ayuda."
+  }
+}

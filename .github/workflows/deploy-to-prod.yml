@@ -1,0 +1,57 @@
+name: Production - Build and Deploy SERHAFEN PORTAL WEB to CloudFront
+
+on:
+  push:
+    branches:
+      - main
+      - prod
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-production:
+    name: Build & Deploy to S3 (Production)
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: 🛎️ Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🧰 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: 📦 Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Turn context into env vars
+        id: turn-context-into-env-vars
+        uses: serhafen-tech/serhafen-portal-web/.github/actions/context-as-env@prod
+        with:
+          vars-context: ${{ toJson(vars) }}
+          secrets-context: ${{ toJson(secrets) }}
+
+      - name: 🛠️ Build for Production
+        run: pnpm run build
+
+      - name: 🔐 Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: arn:aws:iam::917735518620:role/Github_Actions
+          role-session-name: github-actions
+          aws-region: us-east-1
+
+      - name: 🚀 Deploy to S3 (Production)
+        run: |
+          aws s3 cp dist/ s3://serhafen-web-portal-prod/ --recursive
+          aws cloudfront create-invalidation --distribution-id E268LXQ3QFYSIH --paths "/*"
