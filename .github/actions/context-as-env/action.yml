@@ -1,0 +1,34 @@
+name: Context as env vars
+description: |
+  This action will process vars and secret contexts then will set them as env vars.
+inputs:
+  secrets-context:
+    description: "Secret context to be used to set env vars from, usually from toJson(vars)"
+    required: false
+    default: ""
+  vars-context:
+    description: "Vars Context to be used to set env vars from, usually from toJson(secrets)"
+    required: false
+    default: ""
+  envs-context:
+    description: "Vars Context to be used to set env vars from, usually from toJson(env)"
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: 🖥️ Installing Tools
+      continue-on-error: true
+      shell: bash {0}
+      run: |
+        DEBIAN_FRONTEND=noninteractive
+        which jq || (sudo apt-get update > /dev/null && sudo apt-get install -y jq > /dev/null)
+
+    - name: Turn context into env vars
+      id: turn-context-into-env-vars
+      uses: serhafen-tech/serhafen-portal-web/.github/actions/context-as-env/ctx-as-env-action@main
+      with:
+        secrets-context: ${{ inputs.secrets-context }}
+        vars-context: ${{ inputs.vars-context }}
+        envs-context: ${{ inputs.envs-context }}
