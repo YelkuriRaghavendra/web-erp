@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from './ui/button';
-import { useListMawbStore } from '@/store/listMawb';
+// store stub — module not yet implemented
+const useListMawbStore = () => ({ fetchMawbs: () => {} });
 
 const Dashboard: React.FC = () => {
   const { fetchMawbs } = useListMawbStore();
