@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - cicd 
+      - cicd
   workflow_dispatch:
 
 permissions:
@@ -25,14 +25,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-
-      - name: 📦 Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
+          cache: 'npm'
 
       - name: 📦 Install Dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Turn context into env vars
         id: turn-context-into-env-vars
@@ -42,7 +38,7 @@ jobs:
           secrets-context: ${{ toJson(secrets) }}
 
       - name: 🛠️ Build for Staging
-        run: pnpm run build
+        run: npm run build
 
       - name: 🔐 Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v3
