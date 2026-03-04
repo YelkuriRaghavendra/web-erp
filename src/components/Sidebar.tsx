@@ -11,7 +11,6 @@ import {
   User,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
-import serhafenLogo from '@/assets/serhafen_main-logo.png';
 
 interface SidebarProps {
   className?: string;
