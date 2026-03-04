@@ -31,9 +31,7 @@ const Pagination: React.FC<PaginationProps> = ({
       >
         Previous
       </button>
-      <span className='text-sm text-gray-700'>
-        Page {curPage}
-      </span>
+      <span className='text-sm text-gray-700'>Page {curPage}</span>
       <button
         onClick={() => handlePageChange(curPage + 1)}
         disabled={!hasNextPage}

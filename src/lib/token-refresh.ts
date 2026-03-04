@@ -10,13 +10,15 @@ export async function handle401Retry(
   isRetryAttempt = false
 ): Promise<Response> {
   const { getAccessToken, refreshToken, logout } = useAuthStore.getState();
-    if (isRetryAttempt) {
+  if (isRetryAttempt) {
     logout?.();
-    throw new Error('Authentication failed after token refresh - session invalid');
+    throw new Error(
+      'Authentication failed after token refresh - session invalid'
+    );
   }
   if (refreshInProgress) {
     await new Promise(resolve => setTimeout(resolve, 100));
-    
+
     const currentToken = getAccessToken();
     if (currentToken) {
       const retryHeaders = {
@@ -44,16 +46,15 @@ export async function handle401Retry(
       Authorization: `Bearer ${newAccessToken}`,
     };
     const retryInit = { ...init, headers: retryHeaders };
-    
+
     // Make the retry request and mark it as a retry attempt
     const response = await fetch(originalUrl, retryInit);
-    
+
     if (response.status === 401) {
       return await handle401Retry(originalUrl, init, headers, true);
     }
-    
+
     return response;
-    
   } catch (err) {
     logout?.();
     throw err;
@@ -63,6 +64,8 @@ export async function handle401Retry(
 }
 
 export function isAuthEndpoint(path: string): boolean {
-  const isAuth = AUTH_ENDPOINTS.some((endpoint: string) => path.includes(endpoint));
+  const isAuth = AUTH_ENDPOINTS.some((endpoint: string) =>
+    path.includes(endpoint)
+  );
   return isAuth;
 }

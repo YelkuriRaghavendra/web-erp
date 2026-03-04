@@ -27,7 +27,6 @@ const Navbar = () => {
 
   // Sync selectedCountry with URL parameter
   useEffect(() => {
-
     const storedCountry = localStorage.getItem('selectedCountry');
     if (storedCountry) {
       setSelectedCountry(storedCountry);

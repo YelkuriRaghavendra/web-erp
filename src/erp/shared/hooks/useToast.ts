@@ -2,18 +2,18 @@ import { create } from 'zustand';
 
 // ── Global toast store (not persisted) ───────────────────────
 interface ToastStore {
-  msg:     string;
-  type:    'success' | 'error';
+  msg: string;
+  type: 'success' | 'error';
   visible: boolean;
-  show:    (msg: string, type?: 'success' | 'error') => void;
-  hide:    () => void;
+  show: (msg: string, type?: 'success' | 'error') => void;
+  hide: () => void;
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
-export const useToastStore = create<ToastStore>((set) => ({
-  msg:     '',
-  type:    'success',
+export const useToastStore = create<ToastStore>(set => ({
+  msg: '',
+  type: 'success',
   visible: false,
 
   show: (msg, type = 'success') => {
@@ -29,4 +29,4 @@ export const useToastStore = create<ToastStore>((set) => ({
 }));
 
 /** Call in any component to get the showToast function. */
-export const useToast = () => useToastStore((s) => s.show);
+export const useToast = () => useToastStore(s => s.show);

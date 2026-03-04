@@ -1,16 +1,16 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useERPStore }        from '../core/store';
-import { PAGE_ROLES }         from '../core/constants';
-import { AccessDenied }       from '../shared/components/AccessDenied';
-import { DashboardPage }      from '../features/dashboard/DashboardPage';
-import { BillingPage }        from '../features/billing/BillingPage';
-import { PurchasePage }       from '../features/purchase/PurchasePage';
-import { CustomersPage }      from '../features/customers/CustomersPage';
-import { CreditLedgerPage }   from '../features/ledger/CreditLedgerPage';
-import { ReportsPage }        from '../features/reports/ReportsPage';
-import { ItemMasterPage }     from '../features/items/ItemMasterPage';
-import { StaffPage }          from '../features/staff/StaffPage';
-import { AccountsPage }      from '../features/accounts/AccountsPage';
+import { useERPStore } from '../core/store';
+import { PAGE_ROLES } from '../core/constants';
+import { AccessDenied } from '../shared/components/AccessDenied';
+import { DashboardPage } from '../features/dashboard/DashboardPage';
+import { BillingPage } from '../features/billing/BillingPage';
+import { PurchasePage } from '../features/purchase/PurchasePage';
+import { CustomersPage } from '../features/customers/CustomersPage';
+import { CreditLedgerPage } from '../features/ledger/CreditLedgerPage';
+import { ReportsPage } from '../features/reports/ReportsPage';
+import { ItemMasterPage } from '../features/items/ItemMasterPage';
+import { StaffPage } from '../features/staff/StaffPage';
+import { AccountsPage } from '../features/accounts/AccountsPage';
 import type { ERPUser, PageId } from '../core/types';
 
 // ─────────────────────────────────────────────────────────────
@@ -27,8 +27,8 @@ const RoleGate = ({
   user,
   children,
 }: {
-  page:     PageId;
-  user:     ERPUser;
+  page: PageId;
+  user: ERPUser;
   children: React.ReactNode;
 }) => {
   const staff = useERPStore(s => s.staff);
@@ -37,9 +37,9 @@ const RoleGate = ({
   const staffRecord = staff.find(s => s.u === user.u);
 
   if (
-    !staffRecord ||                        // user deleted
-    !staffRecord.active ||                 // account disabled
-    staffRecord.role !== user.role         // role was changed or session tampered
+    !staffRecord || // user deleted
+    !staffRecord.active || // account disabled
+    staffRecord.role !== user.role // role was changed or session tampered
   ) {
     return <AccessDenied />;
   }
@@ -56,15 +56,71 @@ const RoleGate = ({
 // ─────────────────────────────────────────────────────────────
 export const AppRouter = ({ user }: { user: ERPUser }) => (
   <Routes>
-    <Route path="/"          element={<DashboardPage />} />
-    <Route path="/billing"   element={<RoleGate page="billing"   user={user}><BillingPage /></RoleGate>} />
-    <Route path="/purchase"  element={<RoleGate page="purchase"  user={user}><PurchasePage /></RoleGate>} />
-    <Route path="/customers" element={<RoleGate page="customers" user={user}><CustomersPage /></RoleGate>} />
-    <Route path="/ledger"    element={<RoleGate page="ledger"    user={user}><CreditLedgerPage /></RoleGate>} />
-    <Route path="/accounts"  element={<RoleGate page="accounts"  user={user}><AccountsPage /></RoleGate>} />
-    <Route path="/reports"   element={<RoleGate page="reports"   user={user}><ReportsPage /></RoleGate>} />
-    <Route path="/items"     element={<RoleGate page="items"     user={user}><ItemMasterPage /></RoleGate>} />
-    <Route path="/staff"     element={<RoleGate page="staff"     user={user}><StaffPage /></RoleGate>} />
-    <Route path="*"          element={<Navigate to="/" replace />} />
+    <Route path='/' element={<DashboardPage />} />
+    <Route
+      path='/billing'
+      element={
+        <RoleGate page='billing' user={user}>
+          <BillingPage />
+        </RoleGate>
+      }
+    />
+    <Route
+      path='/purchase'
+      element={
+        <RoleGate page='purchase' user={user}>
+          <PurchasePage />
+        </RoleGate>
+      }
+    />
+    <Route
+      path='/customers'
+      element={
+        <RoleGate page='customers' user={user}>
+          <CustomersPage />
+        </RoleGate>
+      }
+    />
+    <Route
+      path='/ledger'
+      element={
+        <RoleGate page='ledger' user={user}>
+          <CreditLedgerPage />
+        </RoleGate>
+      }
+    />
+    <Route
+      path='/accounts'
+      element={
+        <RoleGate page='accounts' user={user}>
+          <AccountsPage />
+        </RoleGate>
+      }
+    />
+    <Route
+      path='/reports'
+      element={
+        <RoleGate page='reports' user={user}>
+          <ReportsPage />
+        </RoleGate>
+      }
+    />
+    <Route
+      path='/items'
+      element={
+        <RoleGate page='items' user={user}>
+          <ItemMasterPage />
+        </RoleGate>
+      }
+    />
+    <Route
+      path='/staff'
+      element={
+        <RoleGate page='staff' user={user}>
+          <StaffPage />
+        </RoleGate>
+      }
+    />
+    <Route path='*' element={<Navigate to='/' replace />} />
   </Routes>
 );

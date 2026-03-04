@@ -1,12 +1,12 @@
 /**
  * Single Refresh Attempt Rule Implementation
- * 
+ *
  * This demonstrates how the improved token refresh strategy works:
- * 
+ *
  * RULE: Only attempt refresh ONCE per failed request
  * - If refresh succeeds → retry original request
  * - If refresh fails OR retry still gets 401 → logout user
- * 
+ *
  * This prevents infinite loops and handles edge cases properly.
  */
 
@@ -14,7 +14,7 @@
 
 /**
  * ✅ SCENARIO 1: Successful Refresh
- * 
+ *
  * 1. User makes API call → 401 (token expired)
  * 2. System attempts refresh → SUCCESS (new token received)
  * 3. Retry original request with new token → 200 OK
@@ -23,7 +23,7 @@
 
 /**
  * ✅ SCENARIO 2: Refresh Fails
- * 
+ *
  * 1. User makes API call → 401 (token expired)
  * 2. System attempts refresh → FAIL (refresh token invalid)
  * 3. Logout user immediately (no retry attempted)
@@ -32,7 +32,7 @@
 
 /**
  * ✅ SCENARIO 3: Refresh Succeeds but Retry Still Gets 401
- * 
+ *
  * 1. User makes API call → 401 (token expired)
  * 2. System attempts refresh → SUCCESS (new token received)
  * 3. Retry original request with new token → 401 (still unauthorized)
@@ -43,7 +43,7 @@
 
 /**
  * ✅ SCENARIO 4: Login Request Gets 401
- * 
+ *
  * 1. User tries to login with wrong credentials → 401
  * 2. System detects this is auth endpoint → NO refresh attempted
  * 3. Return 401 error to show "Invalid credentials"
@@ -52,7 +52,7 @@
 
 /**
  * ✅ SCENARIO 5: Concurrent Requests During Refresh
- * 
+ *
  * 1. Request A → 401 → starts refresh process
  * 2. Request B → 401 → detects refresh in progress → waits
  * 3. Refresh completes with new token
@@ -69,7 +69,7 @@
  */
 
 /**
- * 2. Retry Attempt Detection  
+ * 2. Retry Attempt Detection
  * - `isRetryAttempt` parameter tracks if this is already a retry
  * - If retry fails with 401 → immediate logout (no second refresh)
  */
@@ -95,7 +95,7 @@
  *   queryKey: ['protected-data'],
  *   queryFn: () => apiClient.get('/protected-endpoint')
  * });
- * 
+ *
  * // User doesn't need to handle token refresh manually
  * // The system will either:
  * // - Refresh token and return data

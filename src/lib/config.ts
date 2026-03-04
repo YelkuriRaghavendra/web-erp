@@ -16,13 +16,17 @@ export const Endpoints = {
   listMawbs: `${customsDeclerationService}/v0/mawbs`,
 };
 
-export const AUTH_ENDPOINTS = [Endpoints.login, Endpoints.refreshToken, Endpoints.googleExchange];
+export const AUTH_ENDPOINTS = [
+  Endpoints.login,
+  Endpoints.refreshToken,
+  Endpoints.googleExchange,
+];
 
 export const keyCloakConfig = {
   clientId: keyCloakClientId,
   // keycloakBaseUrl:keycloakBaseUrl,
   redirectUrl: redirectUrl,
-  relam:relam,
+  relam: relam,
 };
 
 export function getApiBase(): string {
@@ -43,10 +47,10 @@ export const buildGoogleLoginUrl = () => {
   const baseUrl = `${rawBase}/realms/${keyCloakConfig.relam}/protocol/openid-connect/auth`;
   const params = new URLSearchParams({
     client_id: keyCloakConfig.clientId,
-    response_type: "code",
+    response_type: 'code',
     redirect_uri: keyCloakConfig.redirectUrl,
-    scope: "openid email profile",
-    kc_idp_hint: "google",
+    scope: 'openid email profile',
+    kc_idp_hint: 'google',
   });
   return `${baseUrl}?${params.toString()}`;
 };

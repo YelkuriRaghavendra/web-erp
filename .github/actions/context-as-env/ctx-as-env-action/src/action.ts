@@ -31,7 +31,7 @@ function expandVariables(ctx: StringMap): StringMap {
 
       history[cleanKey] = true
 
-      if (ctx.hasOwnProperty(cleanKey)) {
+      if (Object.prototype.hasOwnProperty.call(ctx, cleanKey)) {
         return expandValue(ctx[cleanKey], {...history})
       }
       return m

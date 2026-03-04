@@ -42,7 +42,7 @@ export function DataTable<T>({
       <Table>
         <TableHeader>
           <TableRow>
-            {columns.map((column) => (
+            {columns.map(column => (
               <TableHead key={column.key} className={column.className}>
                 {column.header}
               </TableHead>
@@ -50,13 +50,15 @@ export function DataTable<T>({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((item) => (
+          {data.map(item => (
             <TableRow key={keyExtractor(item)}>
-              {columns.map((column) => (
+              {columns.map(column => (
                 <TableCell key={column.key} className={column.className}>
                   {column.render
                     ? column.render(item)
-                    : (item as any)[column.key]}
+                    : ((item as Record<string, unknown>)[
+                        column.key
+                      ] as React.ReactNode)}
                 </TableCell>
               ))}
             </TableRow>

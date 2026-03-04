@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { jwtDecode } from 'jwt-decode';
@@ -195,10 +194,10 @@ export const useAuthStore = create<AuthState>()(
 
           set({ isLoading: true, error: null });
           const payload = {
-            refreshToken:tokens.refreshToken,
+            refreshToken: tokens.refreshToken,
             keyCloakClientId: keyCloakClientId,
-            grantType: 'refresh_token'
-          }
+            grantType: 'refresh_token',
+          };
 
           const response = await apiClient.post<LoginResponse>(
             Endpoints.refreshToken,
@@ -360,7 +359,7 @@ export const useAuthStore = create<AuthState>()(
         );
       },
 
-      setUserInfo: (userInfo) => {
+      setUserInfo: userInfo => {
         set({ userInfo });
         if (userInfo?.default_country) {
           localStorage.setItem('selectedCountry', userInfo.default_country);
