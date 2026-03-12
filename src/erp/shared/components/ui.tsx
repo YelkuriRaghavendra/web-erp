@@ -1,4 +1,5 @@
 import React, { type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 
 // ── Badge ────────────────────────────────────────────────────
 type BadgeColor =
@@ -464,72 +465,74 @@ export const Modal = ({
   children: React.ReactNode;
   onClose: () => void;
   width?: number;
-}) => (
-  <div
-    className='modal-wrap'
-    style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'rgba(15,15,20,.45)',
-      zIndex: 1000,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backdropFilter: 'blur(6px)',
-      padding: 16,
-    }}
-    onClick={onClose}
-  >
+}) =>
+  createPortal(
     <div
-      className='modal-box'
+      className='modal-wrap'
       style={{
-        background: 'var(--canvas)',
-        borderRadius: 16,
-        boxShadow: 'var(--shadow3)',
-        padding: 32,
-        width,
-        maxWidth: '96vw',
-        maxHeight: '92vh',
-        overflowY: 'auto',
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(15,15,20,.45)',
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backdropFilter: 'blur(6px)',
+        padding: 16,
       }}
-      onClick={e => e.stopPropagation()}
+      onClick={onClose}
     >
       <div
+        className='modal-box'
         style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 24,
+          background: 'var(--canvas)',
+          borderRadius: 16,
+          boxShadow: 'var(--shadow3)',
+          padding: 32,
+          width,
+          maxWidth: '96vw',
+          maxHeight: '92vh',
+          overflowY: 'auto',
         }}
+        onClick={e => e.stopPropagation()}
       >
-        <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--ink)' }}>
-          {title}
-        </h3>
-        <button
-          onClick={onClose}
+        <div
           style={{
-            background: 'var(--bg)',
-            border: '1px solid var(--border)',
-            borderRadius: 8,
-            width: 32,
-            height: 32,
             display: 'flex',
+            justifyContent: 'space-between',
             alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            color: 'var(--ink3)',
-            fontSize: 18,
+            marginBottom: 24,
           }}
         >
-          ×
-        </button>
+          <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--ink)' }}>
+            {title}
+          </h3>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'var(--bg)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              width: 32,
+              height: 32,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: 'var(--ink3)',
+              fontSize: 18,
+            }}
+          >
+            ×
+          </button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {children}
+        </div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {children}
-      </div>
-    </div>
-  </div>
-);
+    </div>,
+    document.body
+  );
 
 // ── Toast ────────────────────────────────────────────────────
 export const Toast = ({
@@ -707,6 +710,8 @@ export const Page = ({
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 10,
       }}
     >
       <div>

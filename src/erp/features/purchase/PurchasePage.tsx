@@ -452,13 +452,7 @@ const PurchasesTable = ({
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* Stat cards */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3,1fr)',
-            gap: 14,
-          }}
-        >
+        <div className="erp-grid-3">
           <StatCard
             icon='📦'
             label='Total Purchases'
@@ -906,14 +900,7 @@ export const PurchasePage = () => {
       </div>
 
       {view === 'entry' ? (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 300px',
-            gap: 20,
-            alignItems: 'start',
-          }}
-        >
+        <div className="erp-split-sm">
           {/* LEFT: items received */}
           <div
             style={{

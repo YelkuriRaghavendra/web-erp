@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useERPStore } from '../../core/store';
 import { useToast } from '../../shared/hooks/useToast';
 import { ym } from '../../core/constants';
-import { syncTransaction, syncOpeningBalance } from '../../core/supabase';
+import { syncOpeningBalance, insertTransaction as dbInsertTransaction } from '../../core/supabase';
 import type { Transaction, TxnType } from '../../core/types';
 
 export const TXN_TYPES = [
@@ -181,23 +181,33 @@ export const useAccounts = () => {
     []
   );
 
-  const addTransaction = useCallback(() => {
+  const addTransaction = useCallback(async () => {
     if (!txnForm.amount || +txnForm.amount <= 0) {
       showToast('Enter a valid amount', 'error');
       return;
     }
-    const t: Transaction = {
-      id: crypto.randomUUID(),
-      date: txnForm.date,
-      type: txnForm.type,
-      amount: +txnForm.amount,
-      note: txnForm.note,
-    };
-    setTransactions(p => [...p, t]);
-    syncTransaction(t);
-    setTxnModal(false);
-    setTxnForm(EMPTY_FORM);
-    showToast('Transaction recorded');
+    try {
+      const newId = await dbInsertTransaction({
+        date: txnForm.date,
+        type: txnForm.type,
+        amount: +txnForm.amount,
+        note: txnForm.note,
+      });
+      const t: Transaction = {
+        id: newId,
+        date: txnForm.date,
+        type: txnForm.type,
+        amount: +txnForm.amount,
+        note: txnForm.note,
+      };
+      setTransactions(p => [...p, t]);
+      setTxnModal(false);
+      setTxnForm(EMPTY_FORM);
+      showToast('Transaction recorded');
+    } catch (err) {
+      console.warn('[addTransaction]', err);
+      showToast('Failed to record transaction', 'error');
+    }
   }, [txnForm, setTransactions, showToast]);
 
   // ── Opening Balance modal ──────────────────────────────────

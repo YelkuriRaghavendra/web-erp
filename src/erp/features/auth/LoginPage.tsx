@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Field, Btn } from '../../shared/components/ui';
 import { useERPStore } from '../../core/store';
 import { hashPassword } from '../../core/crypto';
@@ -19,6 +19,7 @@ export const LoginPage = ({ onLogin }: { onLogin: (u: ERPUser) => void }) => {
   const [err, setErr] = useState('');
   const [lockSecs, setLockSecs] = useState(0);
   const [retrying, setRetrying] = useState(false);
+  const [initialFetchDone, setInitialFetchDone] = useState(false);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -29,7 +30,18 @@ export const LoginPage = ({ onLogin }: { onLogin: (u: ERPUser) => void }) => {
     console.log('[LoginPage] retry result:', result);
     if (result.length) setStaff(result);
     setRetrying(false);
+    setInitialFetchDone(true);
   };
+
+  // Auto-fetch staff on mount if store is empty (first load / no session)
+  useEffect(() => {
+    if (staff.length === 0) {
+      void retryFetch();
+    } else {
+      setInitialFetchDone(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const startLockCountdown = (remaining: number) => {
     setLockSecs(Math.ceil(remaining / 1000));
@@ -99,9 +111,9 @@ export const LoginPage = ({ onLogin }: { onLogin: (u: ERPUser) => void }) => {
     if (e.key === 'Enter') void go();
   };
 
-  // LoginPage is only rendered AFTER App.tsx bootstrap is done.
-  // So staff.length === 0 here means: migration not run / DB is empty, not "still loading".
-  const noAccounts = staff.length === 0;
+  // noAccounts: only show the error block if we've finished the auto-fetch and still have nothing
+  const isLoading = !initialFetchDone && staff.length === 0;
+  const noAccounts = initialFetchDone && staff.length === 0;
 
   return (
     <div
@@ -125,37 +137,35 @@ export const LoginPage = ({ onLogin }: { onLogin: (u: ERPUser) => void }) => {
           }}
         >
           {/* Brand */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              marginBottom: 40,
-            }}
-          >
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                background: 'var(--accent)',
-                borderRadius: 12,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 24,
-                boxShadow: '0 4px 12px rgba(232,98,10,.3)',
-              }}
-            >
-              🔥
+          <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:40 }}>
+            <div style={{
+              width:52, height:52,
+              background:'linear-gradient(145deg,#1e1008,#2d1800)',
+              borderRadius:14, flexShrink:0,
+              display:'flex', alignItems:'center', justifyContent:'center',
+              boxShadow:'0 6px 20px rgba(212,80,0,.38), 0 0 0 1px rgba(255,140,0,.28)',
+            }}>
+              <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
+                <defs>
+                  <linearGradient id="lsga-lp" x1="16" y1="2" x2="16" y2="30" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stopColor="#FFE566"/>
+                    <stop offset="50%" stopColor="#FF9200"/>
+                    <stop offset="100%" stopColor="#D44500"/>
+                  </linearGradient>
+                </defs>
+                <path d="M16 2C11 8 7 13 7 18.5C7 24.5 11.1 30 16 30C20.9 30 25 24.5 25 18.5C25 13 21 8 16 2Z" fill="url(#lsga-lp)"/>
+                <path d="M16 10C14.2 13.5 13 17 13.5 20.5C14 23.2 15 25.5 16 27C17 25.5 18 23.2 18.5 20.5C19 17 17.8 13.5 16 10Z" fill="rgba(255,255,255,0.42)"/>
+              </svg>
             </div>
             <div>
-              <div
-                style={{ fontSize: 20, fontWeight: 800, color: 'var(--ink)' }}
-              >
-                GasERP
+              <div style={{ fontSize:18, fontWeight:800, color:'var(--ink)', lineHeight:1.15, letterSpacing:'-.02em' }}>
+                Laxmi Srinivasa
               </div>
-              <div style={{ fontSize: 12, color: 'var(--ink3)' }}>
-                Gas Agency Management
+              <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)', lineHeight:1.3 }}>
+                Gas Agency
+              </div>
+              <div style={{ fontSize:11, color:'var(--ink3)', marginTop:1 }}>
+                Management System
               </div>
             </div>
           </div>
@@ -177,7 +187,32 @@ export const LoginPage = ({ onLogin }: { onLogin: (u: ERPUser) => void }) => {
             </p>
           </div>
 
-          {noAccounts ? (
+          {isLoading ? (
+            /* ── Auto-fetching staff — show spinner ── */
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 16,
+                padding: '32px 0',
+              }}
+            >
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  border: '3px solid var(--border)',
+                  borderTopColor: 'var(--accent)',
+                  borderRadius: '50%',
+                  animation: 'spin 0.7s linear infinite',
+                }}
+              />
+              <div style={{ fontSize: 13, color: 'var(--ink3)', fontWeight: 600 }}>
+                Connecting to database…
+              </div>
+            </div>
+          ) : noAccounts ? (
             /* ── No staff in DB or RLS blocking — show retry + instructions ── */
             <div
               style={{
@@ -317,8 +352,9 @@ export const LoginPage = ({ onLogin }: { onLogin: (u: ERPUser) => void }) => {
         </div>
       </div>
 
-      {/* ── Right: Decorative panel ── */}
+      {/* ── Right: Decorative panel (hidden on mobile via CSS) ── */}
       <div
+        className="erp-login-right"
         style={{
           width: 380,
           background:
@@ -354,28 +390,36 @@ export const LoginPage = ({ onLogin }: { onLogin: (u: ERPUser) => void }) => {
             background: 'rgba(232,98,10,.08)',
           }}
         />
-        <div style={{ position: 'relative', textAlign: 'center' }}>
-          <div style={{ fontSize: 64, marginBottom: 24 }}>⛽</div>
-          <div
-            style={{
-              fontSize: 22,
-              fontWeight: 800,
-              color: '#fff',
-              marginBottom: 12,
-            }}
-          >
-            Smart Gas Agency
+        <div style={{ position:'relative', textAlign:'center' }}>
+          {/* Large decorative flame */}
+          <div style={{ marginBottom:28 }}>
+            <svg width="88" height="88" viewBox="0 0 32 32" fill="none">
+              <defs>
+                <linearGradient id="lsga-panel" x1="16" y1="2" x2="16" y2="30" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#FFE566"/>
+                  <stop offset="50%" stopColor="#FF9200"/>
+                  <stop offset="100%" stopColor="#D44500"/>
+                </linearGradient>
+                <filter id="lsga-glow">
+                  <feGaussianBlur stdDeviation="1.5" result="blur"/>
+                  <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+              </defs>
+              <path d="M16 2C11 8 7 13 7 18.5C7 24.5 11.1 30 16 30C20.9 30 25 24.5 25 18.5C25 13 21 8 16 2Z"
+                fill="url(#lsga-panel)" filter="url(#lsga-glow)"/>
+              <path d="M16 10C14.2 13.5 13 17 13.5 20.5C14 23.2 15 25.5 16 27C17 25.5 18 23.2 18.5 20.5C19 17 17.8 13.5 16 10Z"
+                fill="rgba(255,255,255,0.45)"/>
+            </svg>
           </div>
-          <div
-            style={{
-              fontSize: 14,
-              color: 'rgba(255,255,255,.5)',
-              lineHeight: 1.6,
-            }}
-          >
-            Complete ERP for billing, stock,
-            <br />
-            customers and monthly reports
+          <div style={{ fontSize:11, fontWeight:800, color:'rgba(255,200,80,.7)', letterSpacing:'0.14em', textTransform:'uppercase', marginBottom:10 }}>
+            Laxmi Srinivasa
+          </div>
+          <div style={{ fontSize:26, fontWeight:800, color:'#fff', marginBottom:14, lineHeight:1.1 }}>
+            Gas Agency
+          </div>
+          <div style={{ fontSize:13, color:'rgba(255,255,255,.42)', lineHeight:1.75 }}>
+            Complete ERP for billing, stock,<br/>
+            customers &amp; monthly reports
           </div>
         </div>
       </div>

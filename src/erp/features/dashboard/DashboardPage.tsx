@@ -303,13 +303,7 @@ export const DashboardPage = () => {
         >
           📅 Today
         </div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: 14,
-          }}
-        >
+        <div className="erp-grid-4">
           <Card
             icon='📈'
             label="Today's Revenue"
@@ -355,13 +349,7 @@ export const DashboardPage = () => {
         >
           📊 {monthLabel(currentMonth)} — Profit & Loss
         </div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: 14,
-          }}
-        >
+        <div className="erp-grid-4">
           <Card
             icon='💰'
             label='Revenue'
@@ -436,9 +424,7 @@ export const DashboardPage = () => {
       </div>
 
       {/* ── CASH & BANK + CYLINDERS ─────────────────────── */}
-      <div
-        style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}
-      >
+      <div className="erp-grid-3">
         <HeroCard
           icon='💵'
           label='Cash in Hand'
@@ -466,14 +452,7 @@ export const DashboardPage = () => {
       </div>
 
       {/* ── CYLINDER STOCK + CREDIT OUTSTANDING + INVENTORY ── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          gap: 16,
-          alignItems: 'start',
-        }}
-      >
+      <div className="erp-grid-3" style={{ gap: 16, alignItems: 'start' }}>
         {/* Cylinder stock */}
         <div
           style={{
@@ -787,6 +766,7 @@ export const DashboardPage = () => {
             No bills yet
           </div>
         ) : (
+          <div className="erp-table-scroll">
           <table
             style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}
           >
@@ -881,6 +861,7 @@ export const DashboardPage = () => {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

@@ -132,8 +132,21 @@ export const useBilling = () => {
       return;
     }
 
-    const id = crypto.randomUUID();
-    const ref = id.slice(0, 8).toUpperCase(); // short display reference
+    // Block if any line exceeds available stock — no negative stock allowed
+    const overstock = lines.filter(l => l.qty > (stock[l.itemId]?.qty ?? 0));
+    if (overstock.length) {
+      const first = overstock[0];
+      showToast(
+        `Not enough stock — ${first.itemName}: only ${stock[first.itemId]?.qty ?? 0} available, entered ${first.qty}`,
+        'error'
+      );
+      return;
+    }
+
+    // Generate friendly sequential ID: INV-YYMMDD-NNN
+    const dateStr = date.replace(/-/g, '').slice(2); // "YYMMDD"
+    const dayCount = bills.filter(b => b.date === date).length + 1;
+    const id = `INV-${dateStr}-${String(dayCount).padStart(3, '0')}`;
     const bill: Bill = {
       id,
       date,
@@ -179,7 +192,7 @@ export const useBilling = () => {
                 type: 'DEBIT' as const,
                 date,
                 amount: total,
-                description: `Bill ${ref} — ${desc}`,
+                description: `Bill ${id} — ${desc}`,
                 balance: newBalance,
               },
             ],
@@ -192,9 +205,10 @@ export const useBilling = () => {
 
     resetForm();
     setView('history');
-    showToast(`✓ Bill ${ref} saved`);
+    showToast(`✓ Bill ${id} saved`, 'success');
   }, [
     lines,
+    stock,
     date,
     selectedCustomer,
     payment,

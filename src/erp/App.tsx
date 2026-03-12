@@ -156,6 +156,19 @@ const GasERPInner = () => {
     }
   }, []);
 
+  // ── Mobile detection + sidebar toggle ─────────────────────
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const handler = (e: MediaQueryListEvent) => {
+      setIsMobile(e.matches);
+      if (!e.matches) setSidebarOpen(false); // auto-close on resize to desktop
+    };
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   const navigate = useNavigate();
 
   // ── Store setters ─────────────────────────────────────────
@@ -290,15 +303,57 @@ const GasERPInner = () => {
         fontFamily: "'Plus Jakarta Sans',sans-serif",
       }}
     >
-      <Sidebar user={user} onLogout={handleLogout} />
+      {/* Mobile overlay backdrop */}
+      {isMobile && sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,.5)',
+            zIndex: 199,
+          }}
+        />
+      )}
+      <Sidebar
+        user={user}
+        onLogout={handleLogout}
+        isMobile={isMobile}
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
       <main
         style={{
           flex: 1,
-          padding: '28px 32px',
+          padding: isMobile ? '16px' : '28px 32px',
           overflowY: 'auto',
           background: 'var(--bg)',
+          minWidth: 0,
         }}
       >
+        {/* Mobile hamburger */}
+        {isMobile && (
+          <button
+            onClick={() => setSidebarOpen(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 16,
+              padding: '8px 14px',
+              background: 'var(--canvas)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              cursor: 'pointer',
+              fontSize: 13,
+              fontWeight: 700,
+              color: 'var(--ink)',
+              boxShadow: 'var(--shadow)',
+            }}
+          >
+            <span style={{ fontSize: 16 }}>☰</span> Menu
+          </button>
+        )}
         <AppRouter user={user} />
       </main>
       {visible && <Toast msg={msg} type={type} />}

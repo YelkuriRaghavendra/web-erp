@@ -22,6 +22,10 @@ export const ItemMasterPage = () => {
     savePrice,
     cancelEditPrice,
     toggleItem,
+    pendingToggleItem,
+    requestToggle,
+    confirmToggle,
+    cancelToggle,
     adjustItem,
     adjustItemData,
     adjustQty,
@@ -63,14 +67,7 @@ export const ItemMasterPage = () => {
       </div>
 
       {/* Summary strip */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4,1fr)',
-          gap: 14,
-          marginBottom: 20,
-        }}
-      >
+      <div className="erp-grid-4" style={{ marginBottom: 20 }}>
         {[
           { l: 'Total Items', v: items.length, c: 'var(--ink)' },
           {
@@ -192,13 +189,7 @@ export const ItemMasterPage = () => {
             </span>
             <div style={{ height: 1, flex: 1, background: 'var(--border)' }} />
           </div>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3,1fr)',
-              gap: 14,
-            }}
-          >
+          <div className="erp-grid-3">
             {cylItems.map(item => {
               const qty = stock[item.id]?.qty ?? 0;
               const val = qty * item.price;
@@ -444,7 +435,7 @@ export const ItemMasterPage = () => {
                   </div>
                   <div style={{ padding: '10px 18px' }}>
                     <button
-                      onClick={() => toggleItem(item.id)}
+                      onClick={() => item.active ? requestToggle(item.id) : toggleItem(item.id)}
                       style={{
                         width: '100%',
                         padding: '7px',
@@ -501,11 +492,12 @@ export const ItemMasterPage = () => {
               background: 'var(--canvas)',
               borderRadius: 14,
               border: '1px solid var(--border)',
-              overflow: 'hidden',
+              overflow: 'clip',
               boxShadow: 'var(--shadow2)',
             }}
           >
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ width: '100%', minWidth: 480, borderCollapse: 'collapse' }}>
               <thead>
                 <tr
                   style={{
@@ -753,7 +745,7 @@ export const ItemMasterPage = () => {
                             Adjust
                           </button>
                           <button
-                            onClick={() => toggleItem(item.id)}
+                            onClick={() => item.active ? requestToggle(item.id) : toggleItem(item.id)}
                             style={{
                               padding: '5px 14px',
                               borderRadius: 7,
@@ -819,6 +811,7 @@ export const ItemMasterPage = () => {
                 </tr>
               </tfoot>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -879,6 +872,46 @@ export const ItemMasterPage = () => {
               Cancel
             </Btn>
             <Btn onClick={addItem}>Add Item</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* Disable item confirmation modal */}
+      {pendingToggleItem && (
+        <Modal
+          title='Disable Item?'
+          onClose={cancelToggle}
+          width={400}
+        >
+          <div
+            style={{
+              background: 'var(--redbg)',
+              border: '1px solid var(--redbd)',
+              borderRadius: 8,
+              padding: '12px 16px',
+              fontSize: 13,
+              color: 'var(--red)',
+              fontWeight: 600,
+              marginBottom: 4,
+            }}
+          >
+            ⚠️ Disabling <strong>{pendingToggleItem.name}</strong> will hide it from billing.
+            Any existing bills are not affected.
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              gap: 10,
+              justifyContent: 'flex-end',
+              borderTop: '1px solid var(--border)',
+              paddingTop: 14,
+              marginTop: 4,
+            }}
+          >
+            <Btn variant='ghost' onClick={cancelToggle}>Cancel</Btn>
+            <Btn onClick={confirmToggle} style={{ background: 'var(--red)', border: 'none' }}>
+              Yes, Disable
+            </Btn>
           </div>
         </Modal>
       )}

@@ -2,8 +2,8 @@ import { useState, useMemo, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useERPStore } from '../../core/store';
 import { useToast } from '../../shared/hooks/useToast';
-import { syncPurchase } from '../../core/supabase';
-import type { Purchase, PurchaseLine } from '../../core/types';
+import { syncPurchase, syncStock } from '../../core/supabase';
+import type { Purchase, PurchaseLine, Stock } from '../../core/types';
 
 type RowsMap = Record<string, { qty: string; rate: string }>;
 
@@ -89,29 +89,32 @@ export const usePurchase = () => {
       return;
     }
 
-    const id = crypto.randomUUID();
-    const ref = id.slice(0, 8).toUpperCase(); // short display reference
+    // Generate friendly sequential ID: PO-YYMMDD-NNN
+    const dateStr = date.replace(/-/g, '').slice(2); // "YYMMDD"
+    const dayCount = purchases.filter(p => p.date === date).length + 1;
+    const id = `PO-${dateStr}-${String(dayCount).padStart(3, '0')}`;
     const po: Purchase = { id, date, note, grandTotal, lines };
 
     setPurchases(p => [po, ...p]);
     syncPurchase(po); // ← background sync to Supabase
 
+    // Compute the new stock snapshot, update Zustand once, then sync to DB
+    const newStock: Stock = { ...stock };
     lines.forEach(l => {
-      setStock(p => ({
-        ...p,
-        [l.itemId]: { qty: (p[l.itemId]?.qty ?? 0) + l.qty },
-      }));
+      newStock[l.itemId] = { qty: (newStock[l.itemId]?.qty ?? 0) + l.qty };
     });
+    setStock(newStock);
+    syncStock(newStock); // ← persist stock to Supabase
 
     resetForm();
     setView('history');
-    showToast(`✓ Purchase ${ref} recorded`);
+    showToast(`✓ Purchase ${id} recorded`, 'success');
   }, [
     lines,
+    stock,
     date,
     note,
     grandTotal,
-    purchases,
     setPurchases,
     setStock,
     resetForm,

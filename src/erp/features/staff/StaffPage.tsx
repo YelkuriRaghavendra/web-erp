@@ -63,13 +63,7 @@ export const StaffPage = () => {
       action={<Btn onClick={openAdd}>+ Add Staff</Btn>}
     >
       {/* Role summary strip */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4,1fr)',
-          gap: 14,
-        }}
-      >
+      <div className="erp-grid-4">
         {ROLES.map(role => (
           <div
             key={role}
@@ -131,13 +125,15 @@ export const StaffPage = () => {
             background: 'var(--canvas)',
             border: '1px solid var(--border)',
             borderRadius: 14,
-            overflow: 'hidden',
+            overflow: 'clip',
             boxShadow: 'var(--shadow2)',
           }}
         >
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           <table
             style={{
               width: '100%',
+              minWidth: 520,
               borderCollapse: 'collapse',
               fontSize: 13.5,
             }}
@@ -296,6 +292,7 @@ export const StaffPage = () => {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

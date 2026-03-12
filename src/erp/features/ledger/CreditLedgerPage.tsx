@@ -31,7 +31,7 @@ export const CreditLedgerPage = () => {
       title='Credit Ledger'
       subtitle='Credit accounts are created automatically when a credit bill is raised'
     >
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      <div className="erp-grid-2">
         <StatCard
           icon='📋'
           label='Credit Accounts'
@@ -48,14 +48,7 @@ export const CreditLedgerPage = () => {
         />
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '260px 1fr',
-          gap: 20,
-          alignItems: 'start',
-        }}
-      >
+      <div className="erp-ledger-split" style={{ gap: 20, alignItems: 'start' }}>
         {/* Account list */}
         <div
           style={{
@@ -277,13 +270,15 @@ export const CreditLedgerPage = () => {
                   background: 'var(--canvas)',
                   border: '1px solid var(--border)',
                   borderRadius: 12,
-                  overflow: 'hidden',
+                  overflow: 'clip',
                   boxShadow: 'var(--shadow)',
                 }}
               >
+                <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                 <table
                   style={{
                     width: '100%',
+                    minWidth: 520,
                     borderCollapse: 'collapse',
                     fontSize: 13.5,
                   }}
@@ -482,6 +477,7 @@ export const CreditLedgerPage = () => {
                     </tr>
                   </tfoot>
                 </table>
+                </div>
               </div>
             )}
           </div>

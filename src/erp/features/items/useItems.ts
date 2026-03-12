@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useERPStore } from '../../core/store';
 import { useToast } from '../../shared/hooks/useToast';
 import { isCylinder } from '../../core/constants';
-import { syncItems, syncStock } from '../../core/supabase';
+import { syncItems, syncStock, insertItem, insertStockRow } from '../../core/supabase';
 
 type Filter = 'all' | 'active' | 'inactive';
 const EMPTY_FORM = { name: '', unit: 'Piece', price: '0' };
@@ -81,7 +81,32 @@ export const useItems = () => {
 
   const cancelEditPrice = useCallback(() => setEditId(null), []);
 
-  // ── Toggle active ─────────────────────────────────────────
+  // ── Toggle active (with confirmation guard) ───────────────
+  const [pendingToggleId, setPendingToggleId] = useState<string | null>(null);
+
+  // Call this instead of toggleItem directly — sets up confirmation
+  const requestToggle = useCallback((id: string) => {
+    setPendingToggleId(id);
+  }, []);
+
+  // Confirmed — perform the actual toggle
+  const confirmToggle = useCallback(() => {
+    if (pendingToggleId === null) return;
+    const id = pendingToggleId;
+    setItems(p => {
+      const updated = p.map(it =>
+        it.id === id ? { ...it, active: !it.active } : it
+      );
+      syncItems(updated);
+      return updated;
+    });
+    setPendingToggleId(null);
+  }, [pendingToggleId, setItems]);
+
+  // Cancelled
+  const cancelToggle = useCallback(() => setPendingToggleId(null), []);
+
+  // Legacy direct toggle (kept for internal use / non-destructive enable)
   const toggleItem = useCallback(
     (id: string) => {
       setItems(p => {
@@ -93,6 +118,12 @@ export const useItems = () => {
       });
     },
     [setItems]
+  );
+
+  // The item waiting for toggle confirmation (for modal label)
+  const pendingToggleItem = useMemo(
+    () => (pendingToggleId ? (items.find(i => i.id === pendingToggleId) ?? null) : null),
+    [pendingToggleId, items]
   );
 
   // ── Stock adjust modal ────────────────────────────────────
@@ -121,35 +152,33 @@ export const useItems = () => {
 
   const closeAdjust = useCallback(() => setAdjustItem(null), []);
 
-  // ── Add new item ──────────────────────────────────────────
-  const addItem = useCallback(() => {
+  // ── Add new item  (async — DB generates bigserial ID) ────
+  const addItem = useCallback(async () => {
     if (!form.name.trim()) {
       showToast('Name required', 'error');
       return;
     }
-    const newId = crypto.randomUUID();
-    setItems(p => {
-      const updated = [
+    try {
+      const newId = await insertItem({
+        name: form.name,
+        unit: form.unit,
+        price: +form.price,
+        active: true,
+      });
+      await insertStockRow(newId);
+      // Update local state (DB already persisted both rows)
+      setItems(p => [
         ...p,
-        {
-          id: newId,
-          name: form.name,
-          unit: form.unit,
-          price: +form.price,
-          active: true,
-        },
-      ];
-      syncItems(updated);
-      return updated;
-    });
-    setStock(p => {
-      const updated = { ...p, [newId]: { qty: 0 } };
-      syncStock(updated);
-      return updated;
-    });
-    setAddModal(false);
-    setForm(EMPTY_FORM);
-    showToast('Item added');
+        { id: newId, name: form.name, unit: form.unit, price: +form.price, active: true },
+      ]);
+      setStock(p => ({ ...p, [newId]: { qty: 0 } }));
+      setAddModal(false);
+      setForm(EMPTY_FORM);
+      showToast('Item added');
+    } catch (err) {
+      console.warn('[addItem]', err);
+      showToast('Failed to add item', 'error');
+    }
   }, [form, setItems, setStock, showToast]);
 
   // The item being adjusted (for label in modal)
@@ -180,8 +209,13 @@ export const useItems = () => {
     startEditPrice,
     savePrice,
     cancelEditPrice,
-    // toggle
+    // toggle (requestToggle requires confirmation; toggleItem is instant)
     toggleItem,
+    pendingToggleId,
+    pendingToggleItem,
+    requestToggle,
+    confirmToggle,
+    cancelToggle,
     // stock adjust modal
     adjustItem,
     adjustItemData,

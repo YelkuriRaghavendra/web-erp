@@ -208,12 +208,13 @@ const BillDetailModal = ({
         </div>
 
         {/* Items table */}
-        <div style={{ overflowY: 'auto', maxHeight: 380, flexShrink: 1 }}>
+        <div style={{ overflowY: 'auto', overflowX: 'auto', maxHeight: 380, flexShrink: 1 }}>
           {/* Table header — sticky */}
           <div
             style={{
               display: 'grid',
               gridTemplateColumns: '1fr 72px 108px 108px',
+              minWidth: 360,
               position: 'sticky',
               top: 0,
               zIndex: 1,
@@ -259,6 +260,7 @@ const BillDetailModal = ({
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '1fr 72px 108px 108px',
+                  minWidth: 360,
                   borderBottom:
                     li < filtered.length - 1
                       ? '1px solid var(--border)'
@@ -463,13 +465,7 @@ const BillsTable = ({
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* Stat cards */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4,1fr)',
-            gap: 14,
-          }}
-        >
+        <div className="erp-grid-4">
           <StatCard
             icon='🧾'
             label="Today's Bills"
@@ -938,6 +934,7 @@ export const BillingPage = () => {
                 fontSize: 13,
                 fontWeight: 700,
                 cursor: 'pointer',
+                whiteSpace: 'nowrap',
                 background: view === t.id ? 'var(--accent)' : 'transparent',
                 color: view === t.id ? '#fff' : 'var(--ink3)',
                 transition: 'all .15s',
@@ -951,14 +948,7 @@ export const BillingPage = () => {
       </div>
 
       {view === 'entry' ? (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 320px',
-            gap: 20,
-            alignItems: 'start',
-          }}
-        >
+        <div className="erp-split">
           {/* LEFT: item entry */}
           <div
             style={{
@@ -968,7 +958,7 @@ export const BillingPage = () => {
               background: 'var(--canvas)',
               borderRadius: 16,
               border: '1px solid var(--border)',
-              overflow: 'hidden',
+              overflow: 'clip',
               boxShadow: 'var(--shadow2)',
             }}
           >
@@ -1085,6 +1075,7 @@ export const BillingPage = () => {
               const rate = +(qtys[item.id]?.rate ?? item.price);
               const amt = qty * rate;
               const has = qty > 0;
+              const overQty = qty > avail;
               return (
                 <div
                   key={item.id}
@@ -1096,7 +1087,7 @@ export const BillingPage = () => {
                       idx < activeItems.length - 1
                         ? '1px solid var(--border)'
                         : 'none',
-                    background: has ? '#fffbf7' : 'var(--canvas)',
+                    background: overQty ? 'var(--redbg)' : has ? '#fffbf7' : 'var(--canvas)',
                     transition: 'background .2s',
                   }}
                 >
@@ -1132,10 +1123,10 @@ export const BillingPage = () => {
                           fontSize: 11,
                           marginTop: 3,
                           fontWeight: 600,
-                          color: 'var(--green)',
+                          color: overQty ? 'var(--red)' : 'var(--green)',
                         }}
                       >
-                        {avail} in stock
+                        {overQty ? `⚠ Only ${avail} available` : `${avail} in stock`}
                       </div>
                     </div>
                   </div>
@@ -1151,13 +1142,13 @@ export const BillingPage = () => {
                       style={{
                         width: '100%',
                         textAlign: 'center',
-                        background: has ? 'var(--canvas)' : 'var(--bg)',
-                        border: `2px solid ${has ? 'var(--accent)' : 'var(--border)'}`,
+                        background: 'var(--canvas)',
+                        border: `2px solid ${overQty ? 'var(--red)' : has ? 'var(--accent)' : 'var(--border)'}`,
                         borderRadius: 8,
                         padding: '8px 6px',
                         fontSize: 15,
                         fontWeight: 800,
-                        color: has ? 'var(--accent)' : 'var(--ink3)',
+                        color: overQty ? 'var(--red)' : has ? 'var(--accent)' : 'var(--ink3)',
                         outline: 'none',
                         fontFamily: "'JetBrains Mono',monospace",
                       }}

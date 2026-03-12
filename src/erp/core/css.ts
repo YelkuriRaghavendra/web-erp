@@ -20,12 +20,32 @@ input,select,textarea,button{font-family:'Plus Jakarta Sans',sans-serif;}
 ::-webkit-scrollbar{width:5px;height:5px;}
 ::-webkit-scrollbar-track{background:var(--border);}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px;}
-@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes scaleIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
 .page-enter{animation:fadeUp .3s cubic-bezier(.22,1,.36,1) both;}
 .modal-wrap{animation:fadeIn .2s ease both;}
 .modal-box{animation:scaleIn .25s cubic-bezier(.22,1,.36,1) both;}
+/* ── Responsive grid utilities ─────────────────────────── */
+.erp-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+.erp-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.erp-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.erp-split{display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start;}
+.erp-split-sm{display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start;}
+.erp-ledger-split{display:grid;grid-template-columns:260px 1fr;gap:16px;}
+.erp-table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+@media(max-width:768px){
+  .erp-grid-4{grid-template-columns:repeat(2,1fr);}
+  .erp-grid-3{grid-template-columns:1fr 1fr;}
+  .erp-grid-2{grid-template-columns:1fr;}
+  .erp-split,.erp-split-sm{grid-template-columns:1fr;}
+  .erp-ledger-split{grid-template-columns:1fr;}
+  .erp-login-right{display:none!important;}
+}
+@media(max-width:480px){
+  .erp-grid-3{grid-template-columns:1fr;}
+}
 `;
 
 export default CSS;

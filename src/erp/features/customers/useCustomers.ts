@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useERPStore } from '../../core/store';
 import { useToast } from '../../shared/hooks/useToast';
 import type { Customer } from '../../core/types';
-import { syncCustomer } from '../../core/supabase';
+import { syncCustomer, insertCustomer as dbInsertCustomer } from '../../core/supabase';
 
 const EMPTY_FORM = { name: '', phone: '', address: '', credit: false };
 
@@ -43,23 +43,28 @@ export const useCustomers = () => {
     setPayAmt('');
   }, []);
 
-  const addCustomer = useCallback(() => {
+  const addCustomer = useCallback(async () => {
     if (!form.name.trim()) {
       showToast('Name is required', 'error');
       return;
     }
-    const newC: Customer = {
-      id: crypto.randomUUID(),
+    const customerData = {
       ...form,
       credit: isKanchi || form.credit,
       outstanding: 0,
       joinDate: new Date().toISOString().slice(0, 10),
-      ledger: [],
+      ledger: [] as Customer['ledger'],
     };
-    setCustomers(p => [...p, newC]);
-    syncCustomer(newC);
-    closeAdd();
-    showToast('Customer added');
+    try {
+      const newId = await dbInsertCustomer(customerData);
+      const newC: Customer = { id: newId, ...customerData };
+      setCustomers(p => [...p, newC]);
+      closeAdd();
+      showToast('Customer added');
+    } catch (err) {
+      console.warn('[addCustomer]', err);
+      showToast('Failed to add customer', 'error');
+    }
   }, [form, isKanchi, setCustomers, closeAdd, showToast]);
 
   const recordPayment = useCallback(() => {

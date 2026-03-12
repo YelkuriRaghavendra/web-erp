@@ -73,7 +73,7 @@ export interface BillLine {
 }
 
 export interface Bill {
-  id: string; // "INV-YYMMDD-NNN" (maps to bill_id in DB)
+  id: string;    // "INV-YYMMDD-NNN" (maps to bill_id in DB — text column)
   date: string;
   customerId: string | null; // UUID
   customerName: string;

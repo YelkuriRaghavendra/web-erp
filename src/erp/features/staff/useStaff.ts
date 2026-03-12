@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useERPStore } from '../../core/store';
 import { useToast } from '../../shared/hooks/useToast';
-import { syncStaffMember } from '../../core/supabase';
+import { syncStaffMember, insertStaffMember as dbInsertStaffMember } from '../../core/supabase';
 import { hashPassword } from '../../core/crypto';
 import type { Role, StaffUser } from '../../core/types';
 
@@ -15,6 +15,16 @@ export const useStaff = () => {
     useShallow(s => ({ staff: s.staff, setStaff: s.setStaff }))
   );
   const showToast = useToast();
+
+  // ── Current logged-in username (from session) ─────────────
+  const currentUsername = useMemo(() => {
+    try {
+      const parsed = JSON.parse(sessionStorage.getItem('gas-erp-user') ?? 'null');
+      return typeof parsed?.u === 'string' ? (parsed.u as string) : null;
+    } catch {
+      return null;
+    }
+  }, []);
 
   // ── Modal state ───────────────────────────────────────────
   const [addModal, setAddModal] = useState(false);
@@ -87,8 +97,7 @@ export const useStaff = () => {
 
     const hashed = await hashPassword(form.p); // ← SHA-256 hash
 
-    const member: StaffUser = {
-      id: crypto.randomUUID(),
+    const memberData = {
       name: form.name.trim(),
       u: form.u.trim().toLowerCase(),
       p: hashed, // ← store hash, never plain-text
@@ -97,10 +106,16 @@ export const useStaff = () => {
       createdAt: Date.now(),
     };
 
-    setStaff(p => [...p, member]);
-    syncStaffMember(member); // ← sync hash to Supabase
-    closeAdd();
-    showToast(`${member.name} added`);
+    try {
+      const newId = await dbInsertStaffMember(memberData); // ← DB generates bigserial ID
+      const member: StaffUser = { id: newId, ...memberData };
+      setStaff(p => [...p, member]);
+      closeAdd();
+      showToast(`${member.name} added`);
+    } catch (err) {
+      console.warn('[addStaff]', err);
+      showToast('Failed to add staff member', 'error');
+    }
   }, [form, staff, setStaff, closeAdd, showToast]);
 
   // ── Save role change ──────────────────────────────────────
@@ -121,6 +136,12 @@ export const useStaff = () => {
   // ── Toggle active/inactive ────────────────────────────────
   const toggleActive = useCallback(
     (id: string) => {
+      // Block self-disable — owner cannot lock themselves out
+      const target = staff.find(s => s.id === id);
+      if (target && target.u === currentUsername && target.active) {
+        showToast('You cannot disable your own account', 'error');
+        return;
+      }
       setStaff(p => {
         const updated = p.map(s =>
           s.id === id ? { ...s, active: !s.active } : s
@@ -129,8 +150,10 @@ export const useStaff = () => {
         if (changed) syncStaffMember(changed);
         return updated;
       });
+      const action = target?.active ? 'disabled' : 're-enabled';
+      showToast(`Account ${action}`);
     },
-    [setStaff]
+    [staff, currentUsername, setStaff, showToast]
   );
 
   // ── Reset password (async — hashes new password before storing) ──────

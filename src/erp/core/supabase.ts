@@ -189,6 +189,82 @@ export const fetchAllStaff = async (): Promise<StaffUser[]> => {
 };
 
 // ════════════════════════════════════════════════════════════════
+//  INSERT  — DB generates bigserial ID; returns it as string
+// ════════════════════════════════════════════════════════════════
+
+/** Insert a new item row; returns the DB-generated item_id as string. */
+export const insertItem = async (data: Omit<Item, 'id'>): Promise<string> => {
+  const { data: row, error } = await supabase
+    .from('items')
+    .insert({ name: data.name, unit: data.unit, price: data.price, active: data.active })
+    .select('item_id')
+    .single();
+  if (error) throw error;
+  return String((row as { item_id: unknown }).item_id);
+};
+
+/** Insert a stock row with qty=0 for a newly created item. */
+export const insertStockRow = async (itemId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('stock')
+    .insert({ item_id: itemId, qty: 0 });
+  if (error) console.warn('[Supabase] insertStockRow:', error);
+};
+
+/** Insert a new customer row; returns the DB-generated customer_id as string. */
+export const insertCustomer = async (data: Omit<Customer, 'id'>): Promise<string> => {
+  const { data: row, error } = await supabase
+    .from('customers')
+    .insert({
+      name: data.name,
+      phone: data.phone,
+      address: data.address,
+      credit: data.credit,
+      outstanding: data.outstanding,
+      join_date: data.joinDate,
+      ledger: data.ledger ?? [],
+    })
+    .select('customer_id')
+    .single();
+  if (error) throw error;
+  return String((row as { customer_id: unknown }).customer_id);
+};
+
+/** Insert a new staff row; returns the DB-generated staff_id as string. */
+export const insertStaffMember = async (data: Omit<StaffUser, 'id'>): Promise<string> => {
+  const { data: row, error } = await supabase
+    .from('staff')
+    .insert({
+      username: data.u,
+      name: data.name,
+      role: data.role,
+      active: data.active,
+      password: data.p,
+      created_at: new Date(data.createdAt).toISOString(),
+    })
+    .select('staff_id')
+    .single();
+  if (error) throw error;
+  return String((row as { staff_id: unknown }).staff_id);
+};
+
+/** Insert a new transaction row; returns the DB-generated transaction_id as string. */
+export const insertTransaction = async (data: Omit<Transaction, 'id'>): Promise<string> => {
+  const { data: row, error } = await supabase
+    .from('transactions')
+    .insert({
+      date: data.date,
+      type: data.type,
+      amount: data.amount,
+      note: data.note,
+    })
+    .select('transaction_id')
+    .single();
+  if (error) throw error;
+  return String((row as { transaction_id: unknown }).transaction_id);
+};
+
+// ════════════════════════════════════════════════════════════════
 //  SYNC  — TypeScript `id` maps to DB `<tablename>_id`
 // ════════════════════════════════════════════════════════════════
 

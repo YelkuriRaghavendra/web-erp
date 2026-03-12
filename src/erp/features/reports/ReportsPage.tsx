@@ -48,6 +48,7 @@ export const ReportsPage = () => {
       subtitle='Business P&L, sales analysis and purchase history'
     >
       {/* ── Tab bar ─────────────────────────────────────── */}
+      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
       <div
         style={{
           display: 'flex',
@@ -71,6 +72,7 @@ export const ReportsPage = () => {
               fontSize: 13,
               fontWeight: 700,
               cursor: 'pointer',
+              whiteSpace: 'nowrap',
               background: tab === t.id ? 'var(--accent)' : 'transparent',
               color: tab === t.id ? '#fff' : 'var(--ink3)',
               fontFamily: "'Plus Jakarta Sans',sans-serif",
@@ -80,6 +82,7 @@ export const ReportsPage = () => {
             {t.l}
           </button>
         ))}
+      </div>
       </div>
 
       {/* ─── P&L OVERVIEW ──────────────────────────────── */}
@@ -103,13 +106,7 @@ export const ReportsPage = () => {
           ) : (
             <>
               {/* ── All-time summary cards ─── */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(4, 1fr)',
-                  gap: 14,
-                }}
-              >
+              <div className="erp-grid-4">
                 {[
                   {
                     l: 'All-time Revenue',
@@ -177,7 +174,7 @@ export const ReportsPage = () => {
                   background: 'var(--canvas)',
                   border: '1px solid var(--border)',
                   borderRadius: 14,
-                  overflow: 'hidden',
+                  overflow: 'clip',
                   boxShadow: 'var(--shadow2)',
                 }}
               >
@@ -458,13 +455,7 @@ export const ReportsPage = () => {
       {tab === 'daily' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Summary cards */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3,1fr)',
-              gap: 14,
-            }}
-          >
+          <div className="erp-grid-3">
             {[
               {
                 l: 'Total Bills',
@@ -523,7 +514,7 @@ export const ReportsPage = () => {
               background: 'var(--canvas)',
               border: '1px solid var(--border)',
               borderRadius: 12,
-              overflow: 'hidden',
+              overflow: 'clip',
               boxShadow: 'var(--shadow)',
             }}
           >
@@ -538,9 +529,11 @@ export const ReportsPage = () => {
             >
               Date-wise Sales
             </div>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table
               style={{
                 width: '100%',
+                minWidth: 440,
                 borderCollapse: 'collapse',
                 fontSize: 13.5,
               }}
@@ -651,6 +644,7 @@ export const ReportsPage = () => {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -658,13 +652,7 @@ export const ReportsPage = () => {
       {/* ─── CREDIT REPORT ─────────────────────────────── */}
       {tab === 'credit' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr 1fr',
-              gap: 14,
-            }}
-          >
+          <div className="erp-grid-3">
             {[
               {
                 l: 'Credit Accounts',
@@ -739,13 +727,15 @@ export const ReportsPage = () => {
                 background: 'var(--canvas)',
                 border: '1px solid var(--border)',
                 borderRadius: 14,
-                overflow: 'hidden',
+                overflow: 'clip',
                 boxShadow: 'var(--shadow)',
               }}
             >
+              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
               <table
                 style={{
                   width: '100%',
+                  minWidth: 480,
                   borderCollapse: 'collapse',
                   fontSize: 13,
                 }}
@@ -843,6 +833,7 @@ export const ReportsPage = () => {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </div>
@@ -851,13 +842,7 @@ export const ReportsPage = () => {
       {/* ─── PURCHASES ─────────────────────────────────── */}
       {tab === 'purchase' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3,1fr)',
-              gap: 14,
-            }}
-          >
+          <div className="erp-grid-3">
             {[
               { l: 'Total Orders', v: purchases.length, c: 'var(--green)' },
               {
@@ -912,7 +897,7 @@ export const ReportsPage = () => {
               background: 'var(--canvas)',
               border: '1px solid var(--border)',
               borderRadius: 14,
-              overflow: 'hidden',
+              overflow: 'clip',
               boxShadow: 'var(--shadow)',
             }}
           >
@@ -927,9 +912,11 @@ export const ReportsPage = () => {
             >
               Purchase Orders
             </div>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table
               style={{
                 width: '100%',
+                minWidth: 420,
                 borderCollapse: 'collapse',
                 fontSize: 13.5,
               }}
@@ -1030,6 +1017,7 @@ export const ReportsPage = () => {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}

@@ -73,13 +73,7 @@ export const AccountsPage = () => {
   return (
     <Page title='Cash & Bank' subtitle={`Live balances for ${monthLabel}`}>
       {/* ── Balance cards ─────────────────────────────────── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 16,
-        }}
-      >
+      <div className="erp-grid-3" style={{ gap: 16 }}>
         {/* Cash in Hand */}
         <div
           style={{
@@ -253,7 +247,7 @@ export const AccountsPage = () => {
       </div>
 
       {/* ── Today's activity + Month summary ─────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div className="erp-grid-2" style={{ gap: 16 }}>
         {/* Today */}
         <div
           style={{
@@ -437,13 +431,7 @@ export const AccountsPage = () => {
         >
           Quick Actions
         </div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: 12,
-          }}
-        >
+        <div className="erp-grid-4" style={{ gap: 12 }}>
           {TXN_TYPES.map(t => {
             const bgMap: Record<string, string> = {
               blue: 'linear-gradient(135deg,#2563eb,#1d4ed8)',
@@ -503,7 +491,7 @@ export const AccountsPage = () => {
           background: 'var(--canvas)',
           border: '1px solid var(--border)',
           borderRadius: 14,
-          overflow: 'hidden',
+          overflow: 'clip',
           boxShadow: 'var(--shadow)',
         }}
       >
@@ -523,8 +511,9 @@ export const AccountsPage = () => {
             {txnHistory.length} entries
           </span>
         </div>
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
         <table
-          style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}
+          style={{ width: '100%', minWidth: 440, borderCollapse: 'collapse', fontSize: 13 }}
         >
           <thead>
             <tr style={{ background: 'var(--bg)' }}>
@@ -671,6 +660,7 @@ export const AccountsPage = () => {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* ── Transaction entry modal ────────────────────────── */}

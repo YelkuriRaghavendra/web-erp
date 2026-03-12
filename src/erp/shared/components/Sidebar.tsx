@@ -5,9 +5,12 @@ import type { ERPUser } from '../../core/types';
 interface Props {
   user: ERPUser;
   onLogout: () => void;
+  isMobile?: boolean;
+  open?: boolean;
+  onClose?: () => void;
 }
 
-export const Sidebar = ({ user, onLogout }: Props) => {
+export const Sidebar = ({ user, onLogout, isMobile, open, onClose }: Props) => {
   const location = useLocation();
   const navigate = useNavigate();
   const allowed = NAV.filter(n => n.roles.includes(user.role));
@@ -20,9 +23,18 @@ export const Sidebar = ({ user, onLogout }: Props) => {
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
-        position: 'sticky',
-        top: 0,
         flexShrink: 0,
+        ...(isMobile
+          ? {
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              zIndex: 200,
+              transform: open ? 'translateX(0)' : 'translateX(-220px)',
+              transition: 'transform .25s cubic-bezier(.22,1,.36,1)',
+              boxShadow: open ? '4px 0 24px rgba(0,0,0,.35)' : 'none',
+            }
+          : { position: 'sticky', top: 0 }),
       }}
     >
       {/* Logo */}
@@ -33,6 +45,24 @@ export const Sidebar = ({ user, onLogout }: Props) => {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {isMobile && (
+            <button
+              onClick={onClose}
+              style={{
+                marginLeft: 'auto',
+                background: 'transparent',
+                border: 'none',
+                color: 'rgba(255,255,255,.5)',
+                fontSize: 20,
+                cursor: 'pointer',
+                lineHeight: 1,
+                padding: '0 2px',
+                order: 99,
+              }}
+            >
+              ✕
+            </button>
+          )}
           <div
             style={{
               width: 38,
@@ -113,7 +143,7 @@ export const Sidebar = ({ user, onLogout }: Props) => {
           return (
             <button
               key={n.id}
-              onClick={() => navigate(n.path)}
+              onClick={() => { navigate(n.path); if (isMobile) onClose?.(); }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
