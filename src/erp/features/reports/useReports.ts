@@ -110,10 +110,17 @@ export const useReports = () => {
         const bankToCash = mTxns
           .filter(t => t.type === 'BANK_TO_CASH')
           .reduce((s, t) => s + t.amount, 0);
+        const addToBank = mTxns
+          .filter(t => t.type === 'ADD_TO_BANK')
+          .reduce((s, t) => s + t.amount, 0);
+        const addToCash = mTxns
+          .filter(t => t.type === 'ADD_TO_CASH')
+          .reduce((s, t) => s + t.amount, 0);
         const ob = openingBalances[m] ?? { cash: 0, bank: 0 };
-        const cashCB = ob.cash + cashSales - cashToBank + bankToCash - expCash;
-        const bankCB = ob.bank + upiSales + cashToBank - bankToCash - expBank;
+        const cashCB = ob.cash + cashSales + bankToCash + addToCash - cashToBank - expCash;
+        const bankCB = ob.bank + upiSales + cashToBank + addToBank - bankToCash - expBank;
 
+        const grossProfit = total - purchaseCost;
         const netProfit = total - purchaseCost - totalExpenses;
 
         return {
@@ -125,7 +132,10 @@ export const useReports = () => {
           total,
           purchaseCost,
           totalExpenses,
+          grossProfit,
           netProfit,
+          cashOB: ob.cash,
+          bankOB: ob.bank,
           cashCB,
           bankCB,
           billCount: mBills.length,

@@ -56,7 +56,17 @@ const RoleGate = ({
 // ─────────────────────────────────────────────────────────────
 export const AppRouter = ({ user }: { user: ERPUser }) => (
   <Routes>
-    <Route path='/' element={<DashboardPage />} />
+    {/* Billing role has no dashboard access — redirect to /billing */}
+    <Route
+      path='/'
+      element={
+        user.role === 'Billing' ? (
+          <Navigate to='/billing' replace />
+        ) : (
+          <DashboardPage />
+        )
+      }
+    />
     <Route
       path='/billing'
       element={

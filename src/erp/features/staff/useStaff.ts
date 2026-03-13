@@ -1,20 +1,35 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useERPStore } from '../../core/store';
 import { useToast } from '../../shared/hooks/useToast';
-import { syncStaffMember, insertStaffMember as dbInsertStaffMember } from '../../core/supabase';
+import {
+  fetchAllStaff,
+  syncStaffMember,
+  insertStaffMember as dbInsertStaffMember,
+} from '../../core/supabase';
 import { hashPassword } from '../../core/crypto';
 import type { Role, StaffUser } from '../../core/types';
 
-const ROLES: Role[] = ['Admin', 'Staff', 'Viewer'];
+const ROLES: Role[] = ['Admin', 'Billing'];
 
-const EMPTY_FORM = { name: '', u: '', p: '', role: 'Staff' as Role };
+const EMPTY_FORM = { name: '', u: '', p: '', role: 'Billing' as Role };
 
 export const useStaff = () => {
   const { staff, setStaff } = useERPStore(
     useShallow(s => ({ staff: s.staff, setStaff: s.setStaff }))
   );
   const showToast = useToast();
+
+  // ── Lazy-load full staff list on mount ────────────────────
+  // Bootstrap only seeds a single-row status entry for the current user.
+  // The complete list is only needed on this page, so we fetch it here.
+  // This keeps the login/bootstrap fast while the Staff page always shows
+  // up-to-date data.
+  useEffect(() => {
+    void fetchAllStaff().then(data => {
+      if (data.length) setStaff(data);
+    });
+  }, [setStaff]);
 
   // ── Current logged-in username (from session) ─────────────
   const currentUsername = useMemo(() => {
@@ -32,7 +47,7 @@ export const useStaff = () => {
   const [form, setForm] = useState(EMPTY_FORM);
   const [showPwd, setShowPwd] = useState(false);
   const [editRoleId, setEditRoleId] = useState<string | null>(null);
-  const [newRole, setNewRole] = useState<Role>('Staff');
+  const [newRole, setNewRole] = useState<Role>('Billing');
 
   const setField = useCallback(
     (k: keyof typeof EMPTY_FORM, v: string) => setForm(p => ({ ...p, [k]: v })),

@@ -1223,7 +1223,7 @@ export const PurchasePage = () => {
                     type='date'
                     value={date}
                     onChange={e => setDate(e.target.value)}
-                    style={inputSt}
+                    style={{ ...inputSt, textTransform: 'uppercase' }}
                   />
                 </div>
                 <div>

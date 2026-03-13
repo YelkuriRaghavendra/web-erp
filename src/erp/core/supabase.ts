@@ -3,6 +3,7 @@ import type {
   Bill,
   Purchase,
   Item,
+  ItemType,
   Customer,
   Stock,
   StaffUser,
@@ -18,12 +19,34 @@ export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY as string
 );
 
+// ── Current logged-in user — set by App.tsx after login ───────
+// Used to stamp created_by / updated_by on every write.
+// Defaults to 'system' for any writes that happen before login
+// (should not occur in normal usage).
+let _currentUser = 'system';
+
+export const setCurrentUser = (username: string) => {
+  _currentUser = username;
+};
+
 // ── Fire-and-forget helper ────────────────────────────────────
 const bg = (label: string, q: PromiseLike<{ error: unknown }>) => {
   void q.then(({ error }) => {
     if (error) console.warn(`[Supabase sync] ${label}:`, error);
   });
 };
+
+// ── Timestamp helper ──────────────────────────────────────────
+const ts = (v: unknown): number | undefined =>
+  v ? new Date(v as string).getTime() : undefined;
+
+// ── Audit field helper — returns the four audit fields from a row ─
+const audit = (r: Record<string, unknown>) => ({
+  createdAt: ts(r.created_at),
+  updatedAt: ts(r.updated_at),
+  createdBy: (r.created_by as string) || undefined,
+  updatedBy: (r.updated_by as string) || undefined,
+});
 
 // ════════════════════════════════════════════════════════════════
 //  FETCH  — DB uses <tablename>_id; TypeScript types use `id`
@@ -39,11 +62,14 @@ export const fetchAllItems = async (): Promise<Item[]> => {
     return [];
   }
   return (data ?? []).map(r => ({
-    id: r.item_id as string,
+    id: String(r.item_id),
     name: r.name as string,
     unit: (r.unit ?? 'Nos') as string,
     price: Number(r.price),
     active: r.active as boolean,
+    itemType: ((r.item_type as string) || 'regular') as ItemType,
+    stockSourceId: r.stock_source_id != null ? String(r.stock_source_id) : null,
+    ...audit(r as Record<string, unknown>),
   }));
 };
 
@@ -78,6 +104,7 @@ export const fetchCustomers = async (): Promise<Customer[]> => {
     outstanding: Number(r.outstanding),
     joinDate: (r.join_date ?? '') as string,
     ledger: (r.ledger ?? []) as LedgerEntry[],
+    ...audit(r as Record<string, unknown>),
   }));
 };
 
@@ -108,6 +135,7 @@ export const fetchBills = async (): Promise<Bill[]> => {
         amount: Number(line.amount),
       };
     }),
+    ...audit(b as Record<string, unknown>),
   }));
 };
 
@@ -135,6 +163,7 @@ export const fetchPurchases = async (): Promise<Purchase[]> => {
         total: Number(line.total),
       };
     }),
+    ...audit(p as Record<string, unknown>),
   }));
 };
 
@@ -153,6 +182,7 @@ export const fetchTransactions = async (): Promise<Transaction[]> => {
     type: r.type as Transaction['type'],
     amount: Number(r.amount),
     note: (r.note ?? '') as string,
+    ...audit(r as Record<string, unknown>),
   }));
 };
 
@@ -164,28 +194,97 @@ export const fetchOpeningBalances = async (): Promise<OpeningBalances> => {
   }
   const ob: OpeningBalances = {};
   (data ?? []).forEach(r => {
-    ob[r.month as string] = { cash: Number(r.cash), bank: Number(r.bank) };
+    ob[r.month as string] = {
+      cash: Number(r.cash),
+      bank: Number(r.bank),
+      ...audit(r as Record<string, unknown>),
+    };
   });
   return ob;
 };
 
+/** Staff list for management page — password is NEVER sent to the browser. */
 export const fetchAllStaff = async (): Promise<StaffUser[]> => {
-  const { data, error } = await supabase.from('staff').select('*');
+  const { data, error } = await supabase
+    .from('staff')
+    .select('staff_id, username, name, role, active, created_at, updated_at, created_by, updated_by'); // no password column
   if (error) {
     console.warn('[Supabase] fetchAllStaff:', error);
     return [];
   }
   return (data ?? []).map(r => ({
-    id: r.staff_id as string,
+    id: String(r.staff_id),
     u: r.username as string,
     name: r.name as string,
     role: r.role as Role,
-    p: r.password as string,
+    p: '', // never expose hash to the client via list fetch
     active: r.active as boolean,
     createdAt: r.created_at
       ? new Date(r.created_at as string).getTime()
       : Date.now(),
+    updatedAt: ts(r.updated_at),
+    createdBy: (r.created_by as string) || undefined,
+    updatedBy: (r.updated_by as string) || undefined,
   }));
+};
+
+/**
+ * Server-side login check via Postgres RPC.
+ *
+ * The SHA-256 hash is sent to the DB; the DB compares it against the stored
+ * hash internally and returns only safe user fields on success.
+ * The password column is NEVER returned to the browser — invisible in DevTools.
+ *
+ * Requires migration 005_login_rpc.sql to be applied in Supabase.
+ */
+export const checkStaffLogin = async (
+  username: string,
+  hashedPassword: string,
+): Promise<
+  | { ok: true; user: StaffUser }
+  | { ok: false; reason: 'not_found' | 'wrong_password' | 'inactive' | 'error' }
+> => {
+  const { data, error } = await supabase.rpc('check_staff_login', {
+    p_username: username,
+    p_password_hash: hashedPassword,
+  });
+  if (error) return { ok: false, reason: 'error' };
+  const d = data as Record<string, unknown> | null;
+  if (!d || !d.ok) {
+    const reason = d?.reason as 'not_found' | 'wrong_password' | 'inactive' | undefined;
+    return { ok: false, reason: reason ?? 'not_found' };
+  }
+  return {
+    ok: true,
+    user: {
+      id: String(d.staff_id),
+      u: d.username as string,
+      name: d.name as string,
+      role: d.role as Role,
+      p: '',  // password hash never returned — stays in DB
+      active: d.active as boolean,
+      createdAt: d.created_at
+        ? new Date(d.created_at as string).getTime()
+        : Date.now(),
+    },
+  };
+};
+
+/**
+ * Lightweight session-validation query: returns only the active flag and
+ * role for the given username.  Used during bootstrap to cross-check the
+ * stored session against the DB without fetching all staff rows.
+ */
+export const fetchCurrentUserStatus = async (
+  username: string,
+): Promise<{ active: boolean; role: Role } | null> => {
+  const { data, error } = await supabase
+    .from('staff')
+    .select('active, role')
+    .eq('username', username)
+    .maybeSingle();
+  if (error || !data) return null;
+  return { active: data.active as boolean, role: data.role as Role };
 };
 
 // ════════════════════════════════════════════════════════════════
@@ -196,7 +295,16 @@ export const fetchAllStaff = async (): Promise<StaffUser[]> => {
 export const insertItem = async (data: Omit<Item, 'id'>): Promise<string> => {
   const { data: row, error } = await supabase
     .from('items')
-    .insert({ name: data.name, unit: data.unit, price: data.price, active: data.active })
+    .insert({
+      name: data.name,
+      unit: data.unit,
+      price: data.price,
+      active: data.active,
+      item_type: data.itemType ?? 'regular',
+      stock_source_id: data.stockSourceId ? Number(data.stockSourceId) : null,
+      created_by: _currentUser,
+      updated_by: _currentUser,
+    })
     .select('item_id')
     .single();
   if (error) throw error;
@@ -207,7 +315,12 @@ export const insertItem = async (data: Omit<Item, 'id'>): Promise<string> => {
 export const insertStockRow = async (itemId: string): Promise<void> => {
   const { error } = await supabase
     .from('stock')
-    .insert({ item_id: itemId, qty: 0 });
+    .insert({
+      item_id: itemId,
+      qty: 0,
+      created_by: _currentUser,
+      updated_by: _currentUser,
+    });
   if (error) console.warn('[Supabase] insertStockRow:', error);
 };
 
@@ -223,6 +336,8 @@ export const insertCustomer = async (data: Omit<Customer, 'id'>): Promise<string
       outstanding: data.outstanding,
       join_date: data.joinDate,
       ledger: data.ledger ?? [],
+      created_by: _currentUser,
+      updated_by: _currentUser,
     })
     .select('customer_id')
     .single();
@@ -241,6 +356,8 @@ export const insertStaffMember = async (data: Omit<StaffUser, 'id'>): Promise<st
       active: data.active,
       password: data.p,
       created_at: new Date(data.createdAt).toISOString(),
+      created_by: _currentUser,
+      updated_by: _currentUser,
     })
     .select('staff_id')
     .single();
@@ -257,6 +374,8 @@ export const insertTransaction = async (data: Omit<Transaction, 'id'>): Promise<
       type: data.type,
       amount: data.amount,
       note: data.note,
+      created_by: _currentUser,
+      updated_by: _currentUser,
     })
     .select('transaction_id')
     .single();
@@ -266,59 +385,70 @@ export const insertTransaction = async (data: Omit<Transaction, 'id'>): Promise<
 
 // ════════════════════════════════════════════════════════════════
 //  SYNC  — TypeScript `id` maps to DB `<tablename>_id`
+//  All syncs include updated_by = _currentUser.
+//  The preserve_created_audit DB trigger keeps the original
+//  created_by / created_at if the row already exists.
 // ════════════════════════════════════════════════════════════════
 
 export const syncBill = (bill: Bill) => {
-  bg(
-    'upsert bill',
-    supabase.from('bills').upsert({
-      bill_id: bill.id,
-      date: bill.date,
-      customer_id: bill.customerId,
-      customer_name: bill.customerName,
-      payment: bill.payment,
-      total: bill.total,
-      note: bill.note,
-    })
-  );
-  bg(
-    'upsert bill_lines',
-    supabase.from('bill_lines').upsert(
-      bill.lines.map(l => ({
-        bill_id: bill.id,
-        item_id: l.itemId,
-        item_name: l.itemName,
-        qty: l.qty,
-        price: l.price,
-        amount: l.amount,
-      }))
-    )
-  );
+  // Header must be committed before lines (FK constraint on bill_id)
+  void supabase.from('bills').upsert({
+    bill_id: bill.id,
+    date: bill.date,
+    customer_id: bill.customerId,
+    customer_name: bill.customerName,
+    payment: bill.payment,
+    total: bill.total,
+    note: bill.note,
+    created_by: _currentUser,
+    updated_by: _currentUser,
+  }).then(({ error }) => {
+    if (error) { console.warn('[Supabase sync] upsert bill:', error); return; }
+    bg(
+      'insert bill_lines',
+      supabase.from('bill_lines').insert(
+        bill.lines.map(l => ({
+          bill_id: bill.id,
+          item_id: Number(l.itemId),
+          item_name: l.itemName,
+          qty: l.qty,
+          price: l.price,
+          amount: l.amount,
+          created_by: _currentUser,
+          updated_by: _currentUser,
+        }))
+      )
+    );
+  });
 };
 
 export const syncPurchase = (po: Purchase) => {
-  bg(
-    'upsert purchase',
-    supabase.from('purchases').upsert({
-      purchase_id: po.id,
-      date: po.date,
-      note: po.note,
-      grand_total: po.grandTotal,
-    })
-  );
-  bg(
-    'upsert purchase_lines',
-    supabase.from('purchase_lines').upsert(
-      po.lines.map(l => ({
-        purchase_id: po.id,
-        item_id: l.itemId,
-        item_name: l.itemName,
-        qty: l.qty,
-        rate: l.rate,
-        total: l.total,
-      }))
-    )
-  );
+  // Header must be committed before lines (FK constraint on purchase_id)
+  void supabase.from('purchases').upsert({
+    purchase_id: po.id,
+    date: po.date,
+    note: po.note,
+    grand_total: po.grandTotal,
+    created_by: _currentUser,
+    updated_by: _currentUser,
+  }).then(({ error }) => {
+    if (error) { console.warn('[Supabase sync] upsert purchase:', error); return; }
+    bg(
+      'upsert purchase_lines',
+      supabase.from('purchase_lines').insert(
+        po.lines.map(l => ({
+          purchase_id: po.id,
+          item_id: Number(l.itemId),
+          item_name: l.itemName,
+          qty: l.qty,
+          rate: l.rate,
+          total: l.total,
+          created_by: _currentUser,
+          updated_by: _currentUser,
+        }))
+      )
+    );
+  });
 };
 
 export const syncItems = (items: Item[]) => {
@@ -331,6 +461,10 @@ export const syncItems = (items: Item[]) => {
         unit: i.unit,
         price: i.price,
         active: i.active,
+        item_type: i.itemType ?? 'regular',
+        stock_source_id: i.stockSourceId ? Number(i.stockSourceId) : null,
+        created_by: _currentUser,
+        updated_by: _currentUser,
       }))
     )
   );
@@ -340,6 +474,8 @@ export const syncStock = (stock: Stock) => {
   const rows = Object.entries(stock).map(([item_id, s]) => ({
     item_id,
     qty: s.qty,
+    created_by: _currentUser,
+    updated_by: _currentUser,
   }));
   if (rows.length) bg('upsert stock', supabase.from('stock').upsert(rows));
 };
@@ -356,6 +492,8 @@ export const syncCustomer = (c: Customer) => {
       outstanding: c.outstanding,
       join_date: c.joinDate,
       ledger: c.ledger ?? [],
+      created_by: _currentUser,
+      updated_by: _currentUser,
     })
   );
 };
@@ -369,6 +507,8 @@ export const syncTransaction = (t: Transaction) => {
       type: t.type,
       amount: t.amount,
       note: t.note,
+      created_by: _currentUser,
+      updated_by: _currentUser,
     })
   );
 };
@@ -380,21 +520,30 @@ export const syncOpeningBalance = (
 ) => {
   bg(
     'upsert opening_balance',
-    supabase.from('opening_balances').upsert({ month, cash, bank })
+    supabase.from('opening_balances').upsert({
+      month,
+      cash,
+      bank,
+      created_by: _currentUser,
+      updated_by: _currentUser,
+    })
   );
 };
 
 export const syncStaffMember = (s: StaffUser) => {
-  bg(
-    'upsert staff',
-    supabase.from('staff').upsert({
-      staff_id: s.id,
-      username: s.u,
-      name: s.name,
-      role: s.role,
-      active: s.active,
-      password: s.p,
-      created_at: new Date(s.createdAt).toISOString(),
-    })
-  );
+  // s.p is '' when loaded via fetchAllStaff (password never fetched in list view).
+  // Only include the password column when we actually have a hash to write,
+  // to avoid accidentally overwriting the stored hash with an empty string.
+  const payload: Record<string, unknown> = {
+    staff_id: s.id,
+    username: s.u,
+    name: s.name,
+    role: s.role,
+    active: s.active,
+    created_at: new Date(s.createdAt).toISOString(),
+    created_by: _currentUser,
+    updated_by: _currentUser,
+  };
+  if (s.p) payload.password = s.p; // only set when resetting a password
+  bg('upsert staff', supabase.from('staff').upsert(payload));
 };

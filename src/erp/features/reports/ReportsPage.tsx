@@ -197,7 +197,7 @@ export const ReportsPage = () => {
                     Monthly Breakdown
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--ink3)' }}>
-                    Net Profit = Revenue − Purchases − Expenses
+                    Net Profit = Revenue - Purchases - Expenses
                   </div>
                 </div>
                 <div style={{ overflowX: 'auto' }}>
@@ -211,24 +211,24 @@ export const ReportsPage = () => {
                     <thead>
                       <tr style={{ background: 'var(--bg)' }}>
                         {[
-                          'Month',
-                          'Bills',
-                          'Revenue',
-                          'Purchases',
-                          'Expenses',
-                          'Net Profit',
-                          'Cash Bal',
-                          'Bank Bal',
-                          '',
-                        ].map(h => (
+                          { h: 'Month', align: 'left' },
+                          { h: 'Bills', align: 'left' },
+                          { h: 'Revenue', align: 'right' },
+                          { h: 'Purchases', align: 'right' },
+                          { h: 'Expenses', align: 'right' },
+                          { h: 'Gross Profit', align: 'right' },
+                          { h: 'Net Profit', align: 'right' },
+                          { h: 'Cash OB', align: 'right' },
+                          { h: 'Cash CB', align: 'right' },
+                          { h: 'Bank OB', align: 'right' },
+                          { h: 'Bank CB', align: 'right' },
+                          { h: '', align: 'left' },
+                        ].map(({ h, align }) => (
                           <th
                             key={h}
                             style={{
                               padding: '10px 14px',
-                              textAlign:
-                                h === 'Month' || h === 'Bills' || h === ''
-                                  ? 'left'
-                                  : 'right',
+                              textAlign: align as 'left' | 'right',
                               color: 'var(--ink3)',
                               fontWeight: 700,
                               fontSize: 11,
@@ -287,20 +287,17 @@ export const ReportsPage = () => {
                           <td
                             style={{ padding: '11px 14px', textAlign: 'right' }}
                           >
-                            <Num
-                              v={d.purchaseCost}
-                              color='var(--amber,#d97706)'
-                            />
+                            <Num v={d.purchaseCost} color='var(--amber,#d97706)' />
                           </td>
                           <td
                             style={{ padding: '11px 14px', textAlign: 'right' }}
                           >
-                            <Num
-                              v={d.totalExpenses}
-                              color={
-                                d.totalExpenses > 0 ? 'var(--red)' : undefined
-                              }
-                            />
+                            <Num v={d.totalExpenses} color={d.totalExpenses > 0 ? 'var(--red)' : undefined} />
+                          </td>
+                          <td style={{ padding: '11px 14px', textAlign: 'right' }}>
+                            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 800, color: d.grossProfit >= 0 ? 'var(--blue)' : 'var(--red)' }}>
+                              {d.grossProfit < 0 ? '−' : ''}₹{Math.abs(d.grossProfit).toLocaleString()}
+                            </span>
                           </td>
                           <td
                             style={{ padding: '11px 14px', textAlign: 'right' }}
@@ -309,35 +306,23 @@ export const ReportsPage = () => {
                               style={{
                                 fontFamily: "'JetBrains Mono',monospace",
                                 fontWeight: 800,
-                                color:
-                                  d.netProfit >= 0
-                                    ? 'var(--green)'
-                                    : 'var(--red)',
+                                color: d.netProfit >= 0 ? 'var(--green)' : 'var(--red)',
                               }}
                             >
-                              {d.netProfit >= 0 ? '' : '−'}₹
-                              {Math.abs(d.netProfit).toLocaleString()}
+                              {d.netProfit < 0 ? '−' : ''}₹{Math.abs(d.netProfit).toLocaleString()}
                             </span>
                           </td>
-                          <td
-                            style={{ padding: '11px 14px', textAlign: 'right' }}
-                          >
-                            <Num
-                              v={d.cashCB}
-                              color={
-                                d.cashCB >= 0 ? 'var(--green)' : 'var(--red)'
-                              }
-                            />
+                          <td style={{ padding: '11px 14px', textAlign: 'right' }}>
+                            <Num v={d.cashOB} color='var(--ink3)' />
                           </td>
-                          <td
-                            style={{ padding: '11px 14px', textAlign: 'right' }}
-                          >
-                            <Num
-                              v={d.bankCB}
-                              color={
-                                d.bankCB >= 0 ? 'var(--blue)' : 'var(--red)'
-                              }
-                            />
+                          <td style={{ padding: '11px 14px', textAlign: 'right' }}>
+                            <Num v={d.cashCB} color={d.cashCB >= 0 ? 'var(--green)' : 'var(--red)'} />
+                          </td>
+                          <td style={{ padding: '11px 14px', textAlign: 'right' }}>
+                            <Num v={d.bankOB} color='var(--ink3)' />
+                          </td>
+                          <td style={{ padding: '11px 14px', textAlign: 'right' }}>
+                            <Num v={d.bankCB} color={d.bankCB >= 0 ? 'var(--blue)' : 'var(--red)'} />
                           </td>
                           <td style={{ padding: '11px 14px' }}>
                             <button
@@ -369,78 +354,42 @@ export const ReportsPage = () => {
                           borderTop: '2px solid var(--border)',
                         }}
                       >
-                        <td
-                          style={{
-                            padding: '11px 14px',
-                            fontWeight: 800,
-                            color: 'var(--ink)',
-                          }}
-                        >
+                        <td style={{ padding: '11px 14px', fontWeight: 800, color: 'var(--ink)' }}>
                           Total
                         </td>
-                        <td
-                          style={{
-                            padding: '11px 14px',
-                            color: 'var(--ink3)',
-                            fontSize: 12,
-                          }}
-                        >
+                        <td style={{ padding: '11px 14px', color: 'var(--ink3)', fontSize: 12 }}>
                           {monthlyData.reduce((s, d) => s + d.billCount, 0)}
                         </td>
-                        <td
-                          style={{ padding: '11px 14px', textAlign: 'right' }}
-                        >
-                          <Num
-                            v={monthlyData.reduce((s, d) => s + d.total, 0)}
-                            color='var(--green)'
-                          />
+                        <td style={{ padding: '11px 14px', textAlign: 'right' }}>
+                          <Num v={monthlyData.reduce((s, d) => s + d.total, 0)} color='var(--green)' />
                         </td>
-                        <td
-                          style={{ padding: '11px 14px', textAlign: 'right' }}
-                        >
-                          <Num
-                            v={monthlyData.reduce(
-                              (s, d) => s + d.purchaseCost,
-                              0
-                            )}
-                            color='var(--amber,#d97706)'
-                          />
+                        <td style={{ padding: '11px 14px', textAlign: 'right' }}>
+                          <Num v={monthlyData.reduce((s, d) => s + d.purchaseCost, 0)} color='var(--amber,#d97706)' />
                         </td>
-                        <td
-                          style={{ padding: '11px 14px', textAlign: 'right' }}
-                        >
-                          <Num
-                            v={monthlyData.reduce(
-                              (s, d) => s + d.totalExpenses,
-                              0
-                            )}
-                            color='var(--red)'
-                          />
+                        <td style={{ padding: '11px 14px', textAlign: 'right' }}>
+                          <Num v={monthlyData.reduce((s, d) => s + d.totalExpenses, 0)} color='var(--red)' />
                         </td>
-                        <td
-                          style={{ padding: '11px 14px', textAlign: 'right' }}
-                        >
+                        <td style={{ padding: '11px 14px', textAlign: 'right' }}>
                           {(() => {
-                            const t = monthlyData.reduce(
-                              (s, d) => s + d.netProfit,
-                              0
-                            );
+                            const g = monthlyData.reduce((s, d) => s + d.grossProfit, 0);
                             return (
-                              <span
-                                style={{
-                                  fontFamily: "'JetBrains Mono',monospace",
-                                  fontWeight: 900,
-                                  fontSize: 14,
-                                  color: t >= 0 ? 'var(--green)' : 'var(--red)',
-                                }}
-                              >
-                                {t >= 0 ? '' : '−'}₹
-                                {Math.abs(t).toLocaleString()}
+                              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 900, fontSize: 14, color: g >= 0 ? 'var(--blue)' : 'var(--red)' }}>
+                                {g < 0 ? '−' : ''}₹{Math.abs(g).toLocaleString()}
                               </span>
                             );
                           })()}
                         </td>
-                        <td colSpan={3} />
+                        <td style={{ padding: '11px 14px', textAlign: 'right' }}>
+                          {(() => {
+                            const t = monthlyData.reduce((s, d) => s + d.netProfit, 0);
+                            return (
+                              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 900, fontSize: 14, color: t >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                                {t < 0 ? '−' : ''}₹{Math.abs(t).toLocaleString()}
+                              </span>
+                            );
+                          })()}
+                        </td>
+                        <td colSpan={5} />
                       </tr>
                     </tfoot>
                   </table>

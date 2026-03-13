@@ -1,9 +1,14 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { StatCard, Badge } from '../../shared/components/ui';
+import { Badge } from '../../shared/components/ui';
 import { payLabel, payColor } from '../../shared/components/ui';
 import { useBilling } from './useBilling';
 import type { Bill, BillLine } from '../../core/types';
+
+const fmtDate = (d: string) =>
+  new Date(d + 'T00:00:00').toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric',
+  });
 
 // ── Bill detail modal ─────────────────────────────────────────
 const BillDetailModal = ({
@@ -396,7 +401,7 @@ const COLS: { key: SortCol | null; label: string; align: 'left' | 'right' }[] =
     { key: null, label: '', align: 'left' }, // eye column
   ];
 
-const GRID = '130px 110px 1fr 110px 120px 130px 48px';
+const GRID = '140px 130px 1fr 110px 130px 130px 48px';
 
 const BillsTable = ({
   bills,
@@ -406,6 +411,8 @@ const BillsTable = ({
   todaySummary: TodaySummary;
 }) => {
   const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [sortCol, setSortCol] = useState<SortCol>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
@@ -421,12 +428,14 @@ const BillsTable = ({
   const filtered = bills
     .filter(b => {
       const q = search.toLowerCase();
-      return (
+      const matchSearch =
         b.id.toLowerCase().includes(q) ||
         (b.customerName ?? '').toLowerCase().includes(q) ||
         b.payment.toLowerCase().includes(q) ||
-        b.date.includes(q)
-      );
+        b.date.includes(q);
+      const matchFrom = !dateFrom || b.date >= dateFrom;
+      const matchTo = !dateTo || b.date <= dateTo;
+      return matchSearch && matchFrom && matchTo;
     })
     .sort((a, b) => {
       let cmp = 0;
@@ -465,35 +474,33 @@ const BillsTable = ({
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* Stat cards */}
-        <div className="erp-grid-4">
-          <StatCard
-            icon='🧾'
-            label="Today's Bills"
-            value={todaySummary.count}
-            sub='Bills today'
-            color='orange'
-          />
-          <StatCard
-            icon='💵'
-            label='Cash Today'
-            value={`₹${todaySummary.cash.toLocaleString()}`}
-            sub='Cash collected'
-            color='green'
-          />
-          <StatCard
-            icon='🏦'
-            label='UPI Today'
-            value={`₹${todaySummary.upi.toLocaleString()}`}
-            sub='Bank account'
-            color='blue'
-          />
-          <StatCard
-            icon='📋'
-            label='Credit Today'
-            value={`₹${todaySummary.credit.toLocaleString()}`}
-            sub='On credit'
-            color='red'
-          />
+        <div className='erp-grid-4'>
+          {[
+            { label: "Today's Bills", value: String(todaySummary.count), sub: 'bills raised', color: 'var(--accent)' },
+            { label: 'Cash Collected', value: `₹${todaySummary.cash.toLocaleString()}`, sub: 'received in cash', color: 'var(--green)' },
+            { label: 'UPI Received', value: `₹${todaySummary.upi.toLocaleString()}`, sub: 'to bank account', color: 'var(--blue)' },
+            { label: 'On Credit', value: `₹${todaySummary.credit.toLocaleString()}`, sub: 'pending payment', color: 'var(--red)' },
+          ].map(s => (
+            <div
+              key={s.label}
+              style={{
+                background: 'var(--canvas)',
+                border: '1px solid var(--border)',
+                borderTop: `3px solid ${s.color}`,
+                borderRadius: 12,
+                padding: '20px 22px',
+                boxShadow: 'var(--shadow)',
+              }}
+            >
+              <div style={{ fontSize: 10.5, fontWeight: 800, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10 }}>
+                {s.label}
+              </div>
+              <div style={{ fontSize: 30, fontWeight: 900, color: 'var(--ink)', fontFamily: "'JetBrains Mono',monospace", lineHeight: 1, marginBottom: 8 }}>
+                {s.value}
+              </div>
+              <div style={{ fontSize: 11, color: s.color, fontWeight: 600 }}>{s.sub}</div>
+            </div>
+          ))}
         </div>
 
         {/* Table card */}
@@ -501,105 +508,98 @@ const BillsTable = ({
           style={{
             background: 'var(--canvas)',
             border: '1px solid var(--border)',
-            borderRadius: 14,
+            borderRadius: 16,
             overflow: 'hidden',
             boxShadow: 'var(--shadow2)',
           }}
         >
-          {/* Search toolbar */}
+          {/* Toolbar — single row */}
           <div
             style={{
-              padding: '14px 18px',
+              padding: '12px 16px',
               borderBottom: '1px solid var(--border)',
               background: 'var(--bg)',
               display: 'flex',
               alignItems: 'center',
-              gap: 12,
+              gap: 8,
+              flexWrap: 'wrap',
             }}
           >
-            <div style={{ position: 'relative', flex: 1, maxWidth: 380 }}>
+            {/* Search */}
+            <div style={{ position: 'relative', flex: '1 1 180px', minWidth: 140 }}>
               <svg
-                style={{
-                  position: 'absolute',
-                  left: 11,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  pointerEvents: 'none',
-                }}
-                width='15'
-                height='15'
-                viewBox='0 0 20 20'
-                fill='none'
+                style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+                width='14' height='14' viewBox='0 0 20 20' fill='none'
               >
-                <circle
-                  cx='9'
-                  cy='9'
-                  r='6'
-                  stroke='var(--ink3)'
-                  strokeWidth='2'
-                />
-                <line
-                  x1='13.5'
-                  y1='13.5'
-                  x2='18'
-                  y2='18'
-                  stroke='var(--ink3)'
-                  strokeWidth='2'
-                  strokeLinecap='round'
-                />
+                <circle cx='9' cy='9' r='6' stroke='var(--ink3)' strokeWidth='2' />
+                <line x1='13.5' y1='13.5' x2='18' y2='18' stroke='var(--ink3)' strokeWidth='2' strokeLinecap='round' />
               </svg>
               <input
                 type='text'
-                placeholder='Search by bill no, customer, payment, date…'
+                placeholder='Search bill no, customer, payment…'
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  paddingLeft: 34,
-                  paddingRight: search ? 34 : 12,
-                  paddingTop: 8,
-                  paddingBottom: 8,
-                  borderRadius: 8,
-                  border: '1.5px solid var(--border2)',
-                  background: 'var(--canvas)',
-                  fontSize: 13,
-                  color: 'var(--ink)',
-                  outline: 'none',
-                  fontFamily: "'Plus Jakarta Sans',sans-serif",
+                  width: '100%', boxSizing: 'border-box',
+                  paddingLeft: 30, paddingRight: search ? 28 : 10, paddingTop: 7, paddingBottom: 7,
+                  borderRadius: 99, border: '1.5px solid var(--border2)',
+                  background: 'var(--canvas)', fontSize: 13, color: 'var(--ink)',
+                  outline: 'none', fontFamily: "'Plus Jakarta Sans',sans-serif",
                 }}
               />
               {search && (
-                <button
-                  onClick={() => setSearch('')}
-                  style={{
-                    position: 'absolute',
-                    right: 10,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'var(--ink3)',
-                    fontSize: 16,
-                    padding: 0,
-                    lineHeight: 1,
-                  }}
-                >
-                  &times;
-                </button>
+                <button onClick={() => setSearch('')} style={{
+                  position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--ink3)', fontSize: 15, padding: 0, lineHeight: 1,
+                }}>&times;</button>
               )}
             </div>
-            <span
+
+            {/* Date range */}
+            <input
+              type='date' value={dateFrom} onChange={e => setDateFrom(e.target.value)}
               style={{
-                fontSize: 12,
-                color: 'var(--ink3)',
-                fontWeight: 600,
-                whiteSpace: 'nowrap',
+                padding: '6px 14px', borderRadius: 99, flexShrink: 0,
+                border: `1.5px solid ${dateFrom ? 'var(--accent)' : 'var(--border2)'}`,
+                background: dateFrom ? 'var(--accentbg)' : 'var(--canvas)',
+                fontSize: 12, color: dateFrom ? 'var(--accent)' : 'var(--ink)',
+                outline: 'none', fontFamily: "'Plus Jakarta Sans',sans-serif",
+                fontWeight: dateFrom ? 700 : 400, cursor: 'pointer', textTransform: 'uppercase',
               }}
-            >
-              {filtered.length} of {bills.length} bill
-              {bills.length !== 1 ? 's' : ''}
+            />
+            <span style={{ fontSize: 11, color: 'var(--ink3)', fontWeight: 600, flexShrink: 0 }}>—</span>
+            <input
+              type='date' value={dateTo} onChange={e => setDateTo(e.target.value)}
+              style={{
+                padding: '6px 14px', borderRadius: 99, flexShrink: 0,
+                border: `1.5px solid ${dateTo ? 'var(--accent)' : 'var(--border2)'}`,
+                background: dateTo ? 'var(--accentbg)' : 'var(--canvas)',
+                fontSize: 12, color: dateTo ? 'var(--accent)' : 'var(--ink)',
+                outline: 'none', fontFamily: "'Plus Jakarta Sans',sans-serif",
+                fontWeight: dateTo ? 700 : 400, cursor: 'pointer', textTransform: 'uppercase',
+              }}
+            />
+            {(dateFrom || dateTo) && (
+              <button
+                onClick={() => { setDateFrom(''); setDateTo(''); }}
+                style={{
+                  padding: '6px 14px', borderRadius: 99, flexShrink: 0,
+                  border: '1px solid var(--redbd)', background: 'var(--redbg)',
+                  color: 'var(--red)', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  fontFamily: "'Plus Jakarta Sans',sans-serif",
+                }}
+              >✕ Clear</button>
+            )}
+
+            {/* Count badge */}
+            <span style={{
+              marginLeft: 'auto', fontSize: 12, color: 'var(--ink3)', fontWeight: 600,
+              whiteSpace: 'nowrap', flexShrink: 0,
+              background: 'var(--canvas)', border: '1px solid var(--border)',
+              borderRadius: 99, padding: '3px 10px',
+            }}>
+              {filtered.length} / {bills.length}
             </span>
           </div>
 
@@ -738,7 +738,7 @@ const BillsTable = ({
                     color: 'var(--ink2)',
                   }}
                 >
-                  {bill.date}
+                  {fmtDate(bill.date)}
                 </div>
                 {/* Customer */}
                 <div style={{ padding: '14px 14px' }}>
@@ -767,9 +767,9 @@ const BillsTable = ({
                   <span
                     style={{
                       fontFamily: "'JetBrains Mono',monospace",
-                      fontWeight: 800,
-                      fontSize: 14,
-                      color: 'var(--ink)',
+                      fontWeight: 900,
+                      fontSize: 15,
+                      color: 'var(--accent)',
                     }}
                   >
                     ₹{bill.total.toLocaleString()}
@@ -885,50 +885,54 @@ export const BillingPage = () => {
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 20,
+          alignItems: 'flex-end',
+          marginBottom: 22,
+          flexWrap: 'wrap',
+          gap: 12,
         }}
       >
         <div>
           <h1
             style={{
-              fontSize: 20,
-              fontWeight: 800,
+              fontSize: 22,
+              fontWeight: 900,
               color: 'var(--ink)',
-              letterSpacing: '-.02em',
+              letterSpacing: '-.03em',
             }}
           >
             Billing
           </h1>
-          <p style={{ fontSize: 13, color: 'var(--ink3)', marginTop: 3 }}>
+          <p style={{ fontSize: 12.5, color: 'var(--ink3)', marginTop: 3, fontWeight: 500 }}>
             {new Date().toLocaleDateString('en-IN', {
               weekday: 'long',
               day: 'numeric',
               month: 'long',
+              year: 'numeric',
             })}
           </p>
         </div>
         <div
           style={{
             display: 'flex',
-            gap: 8,
+            gap: 6,
             background: 'var(--canvas)',
             border: '1px solid var(--border)',
             borderRadius: 10,
             padding: 4,
+            boxShadow: 'var(--shadow)',
           }}
         >
           {(
             [
-              { id: 'entry', l: '⌨ New Entry' },
-              { id: 'history', l: '📊 Daily Sales' },
+              { id: 'entry', l: '+ New Entry' },
+              { id: 'history', l: '↗ Sales' },
             ] as const
           ).map(t => (
             <button
               key={t.id}
               onClick={() => setView(t.id as 'entry' | 'history')}
               style={{
-                padding: '7px 18px',
+                padding: '7px 20px',
                 borderRadius: 7,
                 border: 'none',
                 fontSize: 13,
@@ -939,6 +943,8 @@ export const BillingPage = () => {
                 color: view === t.id ? '#fff' : 'var(--ink3)',
                 transition: 'all .15s',
                 fontFamily: "'Plus Jakarta Sans',sans-serif",
+                letterSpacing: view === t.id ? '-.01em' : '0',
+                boxShadow: view === t.id ? '0 2px 8px rgba(232,98,10,.25)' : 'none',
               }}
             >
               {t.l}
@@ -1070,7 +1076,8 @@ export const BillingPage = () => {
 
             {/* Item rows */}
             {activeItems.map((item, idx) => {
-              const avail = stock[item.id]?.qty ?? 0;
+              const stockKey = item.itemType === 'linked' && item.stockSourceId ? item.stockSourceId : item.id;
+              const avail = stock[stockKey]?.qty ?? 0;
               const qty = +(qtys[item.id]?.qty || 0);
               const rate = +(qtys[item.id]?.rate ?? item.price);
               const amt = qty * rate;

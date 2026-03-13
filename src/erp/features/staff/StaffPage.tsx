@@ -8,10 +8,9 @@ import {
 } from '../../shared/components/ui';
 import { useStaff } from './useStaff';
 
-const ROLE_COLORS: Record<string, 'orange' | 'green' | 'blue' | 'gray'> = {
+const ROLE_COLORS: Record<string, 'orange' | 'blue'> = {
   Admin: 'orange',
-  Staff: 'green',
-  Viewer: 'gray',
+  Billing: 'blue',
 };
 
 // Format a numeric timestamp to a readable date
@@ -419,10 +418,8 @@ export const StaffPage = () => {
                     }}
                   >
                     {role === 'Admin' && 'Full access — all pages'}
-                    {role === 'Staff' &&
-                      'Billing, purchase, customers, ledger, reports'}
-                    {role === 'Viewer' &&
-                      'Dashboard, Cash & Bank, reports — read only'}
+                    {role === 'Billing' &&
+                      'Billing, purchase, credit ledger only'}
                   </div>
                 </button>
               ))}
@@ -485,9 +482,7 @@ export const StaffPage = () => {
                   }}
                 >
                   {role === 'Admin' && '— Full access'}
-                  {role === 'Staff' &&
-                    '— Billing, purchase, customers, ledger, reports'}
-                  {role === 'Viewer' && '— Read only'}
+                  {role === 'Billing' && '— Billing, purchase, credit ledger'}
                 </span>
               </button>
             ))}

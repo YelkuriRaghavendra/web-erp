@@ -2,11 +2,27 @@ import { useState, useMemo, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useERPStore } from '../../core/store';
 import { useToast } from '../../shared/hooks/useToast';
-import { isCylinder } from '../../core/constants';
 import { syncItems, syncStock, insertItem, insertStockRow } from '../../core/supabase';
+import type { ItemType } from '../../core/types';
 
 type Filter = 'all' | 'active' | 'inactive';
-const EMPTY_FORM = { name: '', unit: 'Piece', price: '0' };
+
+// Form state for "Add New Item" modal
+interface AddForm {
+  name: string;
+  unit: string;
+  price: string;
+  itemType: ItemType;
+  stockSourceId: string; // empty string = null
+}
+
+const EMPTY_FORM: AddForm = {
+  name: '',
+  unit: 'Piece',
+  price: '0',
+  itemType: 'regular',
+  stockSourceId: '',
+};
 
 export const useItems = () => {
   const { items, stock, setItems, setStock } = useERPStore(
@@ -22,34 +38,59 @@ export const useItems = () => {
   // ── UI state ──────────────────────────────────────────────
   const [filter, setFilter] = useState<Filter>('all');
   const [addModal, setAddModal] = useState(false);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState<AddForm>(EMPTY_FORM);
   const [editId, setEditId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState('');
 
-  // Stock-adjust modal (replaces window.prompt)
+  // Stock-adjust modal
   const [adjustItem, setAdjustItem] = useState<string | null>(null);
   const [adjustQty, setAdjustQty] = useState('');
 
   const setField = useCallback(
-    (k: keyof typeof EMPTY_FORM, v: string) => setForm(p => ({ ...p, [k]: v })),
+    <K extends keyof AddForm>(k: K, v: AddForm[K]) =>
+      setForm(p => ({ ...p, [k]: v })),
     []
   );
 
-  // ── Derived item lists ────────────────────────────────────
+  // Reset stockSourceId when item type changes away from 'linked'
+  const setItemType = useCallback((v: ItemType) => {
+    setForm(p => ({
+      ...p,
+      itemType: v,
+      stockSourceId: v === 'linked' ? p.stockSourceId : '',
+    }));
+  }, []);
+
+  // ── Derived item lists — keyed by itemType, not by name ───
   const passes = useCallback(
     (active: boolean) =>
       filter === 'all' ? true : filter === 'active' ? active : !active,
     [filter]
   );
 
+  // Cylinders — shown in the card-grid section
   const cylItems = useMemo(
-    () => items.filter(i => isCylinder(i.name) && passes(i.active)),
+    () => items.filter(i => i.itemType === 'cylinder' && passes(i.active)),
     [items, passes]
   );
 
-  const otherItems = useMemo(
-    () => items.filter(i => !isCylinder(i.name) && passes(i.active)),
+  // Linked items (e.g. New Connection) — shown in the table with a badge
+  const linkedItems = useMemo(
+    () => items.filter(i => i.itemType === 'linked' && passes(i.active)),
     [items, passes]
+  );
+
+  // Regular items — everything else
+  const otherItems = useMemo(
+    () => items.filter(i => i.itemType === 'regular' && passes(i.active)),
+    [items, passes]
+  );
+
+  // All cylinder items (regardless of filter) — used as source options
+  // in the "Add Item" modal's stock source dropdown.
+  const allCylinderItems = useMemo(
+    () => items.filter(i => i.itemType === 'cylinder' && i.active),
+    [items]
   );
 
   const inventoryValue = useMemo(
@@ -84,12 +125,10 @@ export const useItems = () => {
   // ── Toggle active (with confirmation guard) ───────────────
   const [pendingToggleId, setPendingToggleId] = useState<string | null>(null);
 
-  // Call this instead of toggleItem directly — sets up confirmation
   const requestToggle = useCallback((id: string) => {
     setPendingToggleId(id);
   }, []);
 
-  // Confirmed — perform the actual toggle
   const confirmToggle = useCallback(() => {
     if (pendingToggleId === null) return;
     const id = pendingToggleId;
@@ -103,10 +142,8 @@ export const useItems = () => {
     setPendingToggleId(null);
   }, [pendingToggleId, setItems]);
 
-  // Cancelled
   const cancelToggle = useCallback(() => setPendingToggleId(null), []);
 
-  // Legacy direct toggle (kept for internal use / non-destructive enable)
   const toggleItem = useCallback(
     (id: string) => {
       setItems(p => {
@@ -120,7 +157,6 @@ export const useItems = () => {
     [setItems]
   );
 
-  // The item waiting for toggle confirmation (for modal label)
   const pendingToggleItem = useMemo(
     () => (pendingToggleId ? (items.find(i => i.id === pendingToggleId) ?? null) : null),
     [pendingToggleId, items]
@@ -152,24 +188,96 @@ export const useItems = () => {
 
   const closeAdjust = useCallback(() => setAdjustItem(null), []);
 
-  // ── Add new item  (async — DB generates bigserial ID) ────
+  // ── Link / Unlink item ────────────────────────────────────
+  const [linkEditId, setLinkEditId] = useState<string | null>(null);
+  const [linkEditSourceId, setLinkEditSourceId] = useState('');
+
+  const openLinkEdit = useCallback(
+    (id: string) => {
+      const item = items.find(i => i.id === id);
+      setLinkEditId(id);
+      setLinkEditSourceId(item?.stockSourceId ?? '');
+    },
+    [items]
+  );
+
+  const saveLinkEdit = useCallback(
+    (sourceId: string) => {
+      if (!linkEditId) return;
+      if (!sourceId) {
+        showToast('Select a stock source', 'error');
+        return;
+      }
+      setItems(p => {
+        const updated = p.map(it =>
+          it.id === linkEditId
+            ? { ...it, itemType: 'linked' as const, stockSourceId: sourceId }
+            : it
+        );
+        syncItems(updated);
+        return updated;
+      });
+      setLinkEditId(null);
+      showToast('Item linked to stock source');
+    },
+    [linkEditId, setItems, showToast]
+  );
+
+  const unlinkItem = useCallback(
+    (id: string) => {
+      setItems(p => {
+        const updated = p.map(it =>
+          it.id === id
+            ? { ...it, itemType: 'regular' as const, stockSourceId: null }
+            : it
+        );
+        syncItems(updated);
+        return updated;
+      });
+      showToast('Item unlinked');
+    },
+    [setItems, showToast]
+  );
+
+  const closeLinkEdit = useCallback(() => setLinkEditId(null), []);
+
+  // ── Add new item (async — DB generates bigserial ID) ─────
   const addItem = useCallback(async () => {
     if (!form.name.trim()) {
       showToast('Name required', 'error');
       return;
     }
+    if (form.itemType === 'linked' && !form.stockSourceId) {
+      showToast('Select a stock source for this linked item', 'error');
+      return;
+    }
     try {
+      const stockSourceId =
+        form.itemType === 'linked' && form.stockSourceId
+          ? form.stockSourceId
+          : null;
+
       const newId = await insertItem({
         name: form.name,
         unit: form.unit,
         price: +form.price,
         active: true,
+        itemType: form.itemType,
+        stockSourceId,
       });
       await insertStockRow(newId);
-      // Update local state (DB already persisted both rows)
+
       setItems(p => [
         ...p,
-        { id: newId, name: form.name, unit: form.unit, price: +form.price, active: true },
+        {
+          id: newId,
+          name: form.name,
+          unit: form.unit,
+          price: +form.price,
+          active: true,
+          itemType: form.itemType,
+          stockSourceId,
+        },
       ]);
       setStock(p => ({ ...p, [newId]: { qty: 0 } }));
       setAddModal(false);
@@ -181,7 +289,6 @@ export const useItems = () => {
     }
   }, [form, setItems, setStock, showToast]);
 
-  // The item being adjusted (for label in modal)
   const adjustItemData = useMemo(
     () => (adjustItem ? (items.find(i => i.id === adjustItem) ?? null) : null),
     [adjustItem, items]
@@ -194,13 +301,16 @@ export const useItems = () => {
     filter,
     setFilter,
     cylItems,
+    linkedItems,
     otherItems,
+    allCylinderItems,
     inventoryValue,
     // add modal
     addModal,
     setAddModal,
     form,
     setField,
+    setItemType,
     addItem,
     // price editing
     editId,
@@ -209,7 +319,7 @@ export const useItems = () => {
     startEditPrice,
     savePrice,
     cancelEditPrice,
-    // toggle (requestToggle requires confirmation; toggleItem is instant)
+    // toggle
     toggleItem,
     pendingToggleId,
     pendingToggleItem,
@@ -224,5 +334,13 @@ export const useItems = () => {
     openAdjust,
     saveAdjust,
     closeAdjust,
+    // link / unlink
+    linkEditId,
+    linkEditSourceId,
+    setLinkEditSourceId,
+    openLinkEdit,
+    saveLinkEdit,
+    unlinkItem,
+    closeLinkEdit,
   };
 };

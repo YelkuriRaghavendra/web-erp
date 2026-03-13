@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useERPStore } from '../../core/store';
 import { useToast } from '../../shared/hooks/useToast';
-import { syncBill, syncCustomer } from '../../core/supabase';
+import { syncBill, syncCustomer, syncStock } from '../../core/supabase';
 import type { Bill, BillLine } from '../../core/types';
 
 type QtysMap = Record<string, { qty: string; rate: string }>;
@@ -24,11 +24,20 @@ export const useBilling = () => {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Only show items that are active AND have stock available
-  const activeItems = useMemo(
-    () => items.filter(i => i.active && (stock[i.id]?.qty ?? 0) > 0),
-    [items, stock]
-  );
+  // Active items for billing (data-driven — no name regex):
+  //   'regular' / 'cylinder' → show when their own stock > 0
+  //   'linked'               → show when their stockSourceId item has stock > 0
+  const activeItems = useMemo(() => {
+    return items.filter(i => {
+      if (!i.active) return false;
+      if (i.itemType === 'linked') {
+        // Draw stock from the source item
+        const srcQty = i.stockSourceId ? (stock[i.stockSourceId]?.qty ?? 0) : 0;
+        return srcQty > 0;
+      }
+      return (stock[i.id]?.qty ?? 0) > 0;
+    });
+  }, [items, stock]);
 
   // ── Build an empty qty map keyed by item id ───────────────
   const makeEmptyQtys = useCallback((): QtysMap => {
@@ -132,8 +141,40 @@ export const useBilling = () => {
       return;
     }
 
-    // Block if any line exceeds available stock — no negative stock allowed
-    const overstock = lines.filter(l => l.qty > (stock[l.itemId]?.qty ?? 0));
+    // ── Stock validation — fully data-driven ─────────────────
+    // 1. Group 'linked' item lines by their stockSourceId to check
+    //    whether the source item has enough stock.
+    const linkedDeductions: Record<string, number> = {};
+    lines.forEach(l => {
+      const item = items.find(i => i.id === l.itemId);
+      if (item?.itemType === 'linked' && item.stockSourceId) {
+        linkedDeductions[item.stockSourceId] =
+          (linkedDeductions[item.stockSourceId] ?? 0) + l.qty;
+      }
+    });
+
+    for (const [srcId, neededQty] of Object.entries(linkedDeductions)) {
+      const srcItem = items.find(i => i.id === srcId);
+      const available = stock[srcId]?.qty ?? 0;
+      // Also count any direct lines for the source item in this same bill
+      const directQty = lines
+        .filter(l => l.itemId === srcId)
+        .reduce((s, l) => s + l.qty, 0);
+      if (neededQty + directQty > available) {
+        showToast(
+          `Not enough ${srcItem?.name ?? 'source'} stock — need ${neededQty + directQty}, have ${available}`,
+          'error'
+        );
+        return;
+      }
+    }
+
+    // 2. Validate own-stock items (regular + cylinder)
+    const overstock = lines.filter(l => {
+      const item = items.find(i => i.id === l.itemId);
+      if (!item || item.itemType === 'linked') return false;
+      return l.qty > (stock[l.itemId]?.qty ?? 0);
+    });
     if (overstock.length) {
       const first = overstock[0];
       showToast(
@@ -161,12 +202,23 @@ export const useBilling = () => {
     setBills(p => [bill, ...p]);
     syncBill(bill); // ← background sync to Supabase
 
-    // Deduct stock
-    lines.forEach(l => {
-      setStock(p => ({
-        ...p,
-        [l.itemId]: { qty: Math.max(0, (p[l.itemId]?.qty ?? 0) - l.qty) },
-      }));
+    // ── Stock deduction — data-driven ─────────────────────────
+    // 'linked' items deduct from their stockSourceId.
+    // All other items deduct from their own stock.
+    setStock(p => {
+      const updated = { ...p };
+      lines.forEach(l => {
+        const item = items.find(i => i.id === l.itemId);
+        const deductFrom =
+          item?.itemType === 'linked' && item.stockSourceId
+            ? item.stockSourceId
+            : l.itemId;
+        updated[deductFrom] = {
+          qty: Math.max(0, (updated[deductFrom]?.qty ?? 0) - l.qty),
+        };
+      });
+      syncStock(updated); // ← persist updated stock to Supabase
+      return updated;
     });
 
     // Update credit ledger if payment is Credit
@@ -208,6 +260,7 @@ export const useBilling = () => {
     showToast(`✓ Bill ${id} saved`, 'success');
   }, [
     lines,
+    items,
     stock,
     date,
     selectedCustomer,

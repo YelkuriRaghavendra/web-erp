@@ -9,7 +9,7 @@ import { LoginPage } from './features/auth/LoginPage';
 import { AppRouter } from './router/AppRouter';
 import { useERPStore } from './core/store';
 import {
-  fetchAllStaff,
+  fetchCurrentUserStatus,
   fetchAllItems,
   fetchStock,
   fetchCustomers,
@@ -17,11 +17,12 @@ import {
   fetchPurchases,
   fetchTransactions,
   fetchOpeningBalances,
+  setCurrentUser,
 } from './core/supabase';
 import type { ERPUser, Role } from './core/types';
 
 // ── Valid roles — used to harden the type guard ───────────────
-const VALID_ROLES: Role[] = ['Admin', 'Staff', 'Viewer'];
+const VALID_ROLES: Role[] = ['Admin', 'Billing'];
 
 // ── Session TTL: 8 hours ──────────────────────────────────────
 const SESSION_TTL = 8 * 60 * 60 * 1000;
@@ -207,15 +208,40 @@ const GasERPInner = () => {
 
   // Shared bootstrap function — called from effect (session restore)
   // and from handleLogin (fresh login).
-  const doBootstrap = useCallback(async () => {
+  //
+  // Instead of fetching ALL staff rows (which previously caused a second staff
+  // network request with the full list), we now do a single lightweight query
+  // for the current user's active/role status. This:
+  //   • eliminates the redundant bulk staff fetch on every login/session-restore
+  //   • feeds the RoleGate cross-validator with a fresh DB value (not stale session)
+  //   • replaces the old "Loading staff…" step with one tiny targeted query
+  //
+  // Full staff list is loaded lazily in useStaff.ts when the Staff page opens.
+  const doBootstrap = useCallback(async (currentUser: ERPUser) => {
     if (bootstrapRan.current) return;
     bootstrapRan.current = true;
     setBootstrapping(true);
 
     try {
-      setBootStatus('Loading staff…');
-      const staff = await fetchAllStaff();
-      if (staff.length) setStaff(staff);
+      // ── Validate current session against DB (one-row, no password) ──
+      setBootStatus('Validating session…');
+      const status = await fetchCurrentUserStatus(currentUser.u);
+
+      // Register the current user so all subsequent writes carry the correct
+      // created_by / updated_by stamps on every insert and sync.
+      setCurrentUser(currentUser.u);
+
+      // Seed the staff store with a single entry for this user so the
+      // RoleGate can cross-validate role + active status immediately.
+      setStaff([{
+        id: '',
+        u: currentUser.u,
+        name: currentUser.name,
+        role: status?.role ?? currentUser.role,    // prefer fresh DB value
+        p: '',                                      // hash never stored client-side
+        active: status?.active ?? true,             // fresh from DB
+        createdAt: currentUser.createdAt,
+      }]);
 
       setBootStatus('Loading items & stock…');
       const [items, stock] = await Promise.all([fetchAllItems(), fetchStock()]);
@@ -261,7 +287,7 @@ const GasERPInner = () => {
   // If a session was already present on mount, bootstrap immediately.
   // (No bootstrap runs if there's no session — login page shows instantly.)
   useEffect(() => {
-    if (user) void doBootstrap();
+    if (user) void doBootstrap(user);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -273,7 +299,7 @@ const GasERPInner = () => {
       setUser(session);
       // Reset so bootstrap runs fresh for this login
       bootstrapRan.current = false;
-      void doBootstrap();
+      void doBootstrap(session);
     },
     [doBootstrap]
   );
@@ -281,6 +307,7 @@ const GasERPInner = () => {
   // ── Logout handler ────────────────────────────────────────
   const handleLogout = useCallback(() => {
     sessionStorage.removeItem('gas-erp-user');
+    setCurrentUser(''); // clear username so no writes carry stale audit info
     setUser(null);
     bootstrapRan.current = false;
     navigate('/', { replace: true });

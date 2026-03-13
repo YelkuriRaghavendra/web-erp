@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useERPStore } from '../../core/store';
-import { isCylinder, ym, monthLabel } from '../../core/constants';
+import { ym, monthLabel } from '../../core/constants';
 import { payLabel, payColor, Badge } from '../../shared/components/ui';
 
 // ── Tiny helpers ────────────────────────────────────────────────
@@ -149,17 +149,33 @@ export const DashboardPage = () => {
   } = useERPStore();
 
   const today = new Date().toISOString().slice(0, 10);
-  const currentMonth = today.slice(0, 7);
+  const thisMonth = today.slice(0, 7);
+  const [selectedMonth, setSelectedMonth] = useState(thisMonth);
+  const currentMonth = selectedMonth;
+
+  const prevMonth = () => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const d = new Date(y, m - 2, 1);
+    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+  const nextMonth = () => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const d = new Date(y, m, 1);
+    const next = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    if (next <= thisMonth) setSelectedMonth(next);
+  };
 
   // ── Today's stats ────────────────────────────────────────────
   const todayBills = useMemo(
     () => bills.filter(b => b.date === today),
     [bills, today]
   );
-  const todayRevenue = useMemo(
-    () => todayBills.reduce((s, b) => s + b.total, 0),
-    [todayBills]
-  );
+  const { todayRevenue, todayCash, todayUPI, todayCredit } = useMemo(() => ({
+    todayRevenue: todayBills.reduce((s, b) => s + b.total, 0),
+    todayCash: todayBills.filter(b => b.payment === 'Cash').reduce((s, b) => s + b.total, 0),
+    todayUPI: todayBills.filter(b => b.payment === 'UPI').reduce((s, b) => s + b.total, 0),
+    todayCredit: todayBills.filter(b => b.payment === 'Credit').reduce((s, b) => s + b.total, 0),
+  }), [todayBills]);
 
   // ── This month's P&L ─────────────────────────────────────────
   const {
@@ -191,11 +207,13 @@ export const DashboardPage = () => {
       .filter(t => t.type === 'EXPENSE_CASH' || t.type === 'EXPENSE_BANK')
       .reduce((s, t) => s + t.amount, 0);
 
+    const monthGrossProfit = monthRevenue - monthCost;
     const monthNetProfit = monthRevenue - monthCost - monthExpenses;
     return {
       monthRevenue,
       monthCost,
       monthExpenses,
+      monthGrossProfit,
       monthNetProfit,
       monthCashSales,
       monthUpiSales,
@@ -204,31 +222,23 @@ export const DashboardPage = () => {
   }, [bills, purchases, transactions, currentMonth]);
 
   // ── Cash & Bank balances (current month) ────────────────────
-  const { currentCash, currentBank } = useMemo(() => {
+  const { currentCash, currentBank, cashOB, bankOB } = useMemo(() => {
     const ob = openingBalances[currentMonth] ?? { cash: 0, bank: 0 };
     const mBills = bills.filter(b => ym(b.date) === currentMonth);
-    const cashSales = mBills
-      .filter(b => b.payment === 'Cash')
-      .reduce((s, b) => s + b.total, 0);
-    const upiSales = mBills
-      .filter(b => b.payment === 'UPI')
-      .reduce((s, b) => s + b.total, 0);
+    const cashSales = mBills.filter(b => b.payment === 'Cash').reduce((s, b) => s + b.total, 0);
+    const upiSales = mBills.filter(b => b.payment === 'UPI').reduce((s, b) => s + b.total, 0);
     const mTxns = transactions.filter(t => ym(t.date) === currentMonth);
-    const cashToBank = mTxns
-      .filter(t => t.type === 'CASH_TO_BANK')
-      .reduce((s, t) => s + t.amount, 0);
-    const bankToCash = mTxns
-      .filter(t => t.type === 'BANK_TO_CASH')
-      .reduce((s, t) => s + t.amount, 0);
-    const expCash = mTxns
-      .filter(t => t.type === 'EXPENSE_CASH')
-      .reduce((s, t) => s + t.amount, 0);
-    const expBank = mTxns
-      .filter(t => t.type === 'EXPENSE_BANK')
-      .reduce((s, t) => s + t.amount, 0);
+    const cashToBank = mTxns.filter(t => t.type === 'CASH_TO_BANK').reduce((s, t) => s + t.amount, 0);
+    const bankToCash = mTxns.filter(t => t.type === 'BANK_TO_CASH').reduce((s, t) => s + t.amount, 0);
+    const expCash = mTxns.filter(t => t.type === 'EXPENSE_CASH').reduce((s, t) => s + t.amount, 0);
+    const expBank = mTxns.filter(t => t.type === 'EXPENSE_BANK').reduce((s, t) => s + t.amount, 0);
+    const addToBank = mTxns.filter(t => t.type === 'ADD_TO_BANK').reduce((s, t) => s + t.amount, 0);
+    const addToCash = mTxns.filter(t => t.type === 'ADD_TO_CASH').reduce((s, t) => s + t.amount, 0);
     return {
-      currentCash: ob.cash + cashSales + bankToCash - cashToBank - expCash,
-      currentBank: ob.bank + upiSales + cashToBank - bankToCash - expBank,
+      cashOB: ob.cash,
+      bankOB: ob.bank,
+      currentCash: ob.cash + cashSales + bankToCash + addToCash - cashToBank - expCash,
+      currentBank: ob.bank + upiSales + cashToBank + addToBank - bankToCash - expBank,
     };
   }, [bills, transactions, openingBalances, currentMonth]);
 
@@ -250,7 +260,7 @@ export const DashboardPage = () => {
   const cylinders = useMemo(
     () =>
       items
-        .filter(i => isCylinder(i.name) && i.active)
+        .filter(i => i.itemType === 'cylinder' && i.active)
         .map(it => ({
           ...it,
           qty: stock[it.id]?.qty ?? 0,
@@ -274,23 +284,38 @@ export const DashboardPage = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* ── Page header ────────────────────────────────── */}
-      <div>
-        <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--ink)' }}>
-          Dashboard
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--ink)' }}>
+            Dashboard
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--ink3)', marginTop: 2 }}>
+            {new Date().toLocaleDateString('en-IN', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })}
+          </div>
         </div>
-        <div style={{ fontSize: 13, color: 'var(--ink3)', marginTop: 2 }}>
-          {new Date().toLocaleDateString('en-IN', {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-          })}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={prevMonth}
+            style={{ border: '1px solid var(--border)', background: 'var(--canvas)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 16, color: 'var(--ink2)' }}
+          >‹</button>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', minWidth: 90, textAlign: 'center' }}>
+            {monthLabel(selectedMonth)}
+          </span>
+          <button
+            onClick={nextMonth}
+            disabled={selectedMonth >= thisMonth}
+            style={{ border: '1px solid var(--border)', background: 'var(--canvas)', borderRadius: 8, padding: '6px 12px', cursor: selectedMonth >= thisMonth ? 'not-allowed' : 'pointer', fontSize: 16, color: selectedMonth >= thisMonth ? 'var(--ink3)' : 'var(--ink2)', opacity: selectedMonth >= thisMonth ? 0.4 : 1 }}
+          >›</button>
         </div>
       </div>
 
-      {/* ── Section label helper ─────────────────────── */}
-      {/* ── TODAY ──────────────────────────────────────── */}
-      <div>
+      {/* ── TODAY (only when viewing current month) ─────── */}
+      {selectedMonth === thisMonth ? <div>
         <div
           style={{
             fontSize: 11,
@@ -313,27 +338,27 @@ export const DashboardPage = () => {
           />
           <Card
             icon='💵'
-            label='Cash Sales'
-            value={fmt(monthCashSales)}
-            sub='This month (cash)'
+            label="Today's Cash"
+            value={fmt(todayCash)}
+            sub='Cash collected today'
             color='var(--green)'
           />
           <Card
             icon='📲'
-            label='UPI / Bank Sales'
-            value={fmt(monthUpiSales)}
-            sub='This month (UPI)'
+            label="Today's UPI"
+            value={fmt(todayUPI)}
+            sub='UPI / Online today'
             color='var(--blue)'
           />
           <Card
             icon='📋'
-            label='Credit Sales'
-            value={fmt(monthCreditSales)}
-            sub='This month (credit)'
+            label="Today's Credit"
+            value={fmt(todayCredit)}
+            sub='Credit given today'
             color='var(--amber,#d97706)'
           />
         </div>
-      </div>
+      </div> : null}
 
       {/* ── THIS MONTH P&L ─────────────────────────────── */}
       <div>
@@ -373,82 +398,93 @@ export const DashboardPage = () => {
           />
           <div
             style={{
-              background:
-                monthNetProfit >= 0
-                  ? 'linear-gradient(135deg,#16a34a,#15803d)'
-                  : 'linear-gradient(135deg,#dc2626,#b91c1c)',
+              background: monthNetProfit >= 0
+                ? 'linear-gradient(135deg,#16a34a,#15803d)'
+                : 'linear-gradient(135deg,#dc2626,#b91c1c)',
               borderRadius: 14,
               padding: '20px 22px',
-              boxShadow:
-                monthNetProfit >= 0
-                  ? '0 6px 20px rgba(22,163,74,.25)'
-                  : '0 6px 20px rgba(220,38,38,.25)',
+              boxShadow: monthNetProfit >= 0
+                ? '0 6px 20px rgba(22,163,74,.25)'
+                : '0 6px 20px rgba(220,38,38,.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
             }}
           >
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: 'rgba(255,255,255,.7)',
-                textTransform: 'uppercase',
-                letterSpacing: '.07em',
-                display: 'flex',
-                gap: 6,
-              }}
-            >
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,.7)', textTransform: 'uppercase', letterSpacing: '.07em', display: 'flex', gap: 6 }}>
               <span>{monthNetProfit >= 0 ? '🎯' : '⚠️'}</span>Net Profit
             </div>
-            <div
-              style={{
-                fontSize: 24,
-                fontWeight: 900,
-                color: '#fff',
-                fontFamily: "'JetBrains Mono',monospace",
-                marginTop: 6,
-              }}
-            >
-              {monthNetProfit >= 0 ? '' : '−'}
-              {fmt(Math.abs(monthNetProfit))}
+            <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', fontFamily: "'JetBrains Mono',monospace", marginTop: 2 }}>
+              {monthNetProfit >= 0 ? '' : '−'}{fmt(Math.abs(monthNetProfit))}
             </div>
-            <div
-              style={{
-                fontSize: 11,
-                color: 'rgba(255,255,255,.55)',
-                marginTop: 4,
-              }}
-            >
-              Revenue − Purchases − Expenses
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,.55)', marginTop: 2 }}>
+              Revenue - Purchases - Expenses
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── CASH & BANK + CYLINDERS ─────────────────────── */}
-      <div className="erp-grid-3">
-        <HeroCard
-          icon='💵'
-          label='Cash in Hand'
-          value={fmt(currentCash)}
-          sub='Live balance this month'
-          gradient='linear-gradient(135deg,#16a34a,#15803d)'
-          glow='0 8px 24px rgba(22,163,74,.25)'
-        />
-        <HeroCard
-          icon='🏦'
-          label='Bank Account'
-          value={fmt(currentBank)}
-          sub='Live balance this month'
-          gradient='linear-gradient(135deg,#2563eb,#1d4ed8)'
-          glow='0 8px 24px rgba(37,99,235,.25)'
-        />
-        <HeroCard
-          icon='💼'
-          label='Total Funds'
-          value={fmt(currentCash + currentBank)}
-          sub='Cash + Bank'
-          gradient='linear-gradient(135deg,#7c3aed,#6d28d9)'
-          glow='0 8px 24px rgba(124,58,237,.25)'
-        />
+      {/* ── THIS MONTH SALES BREAKDOWN ─────────────────── */}
+      <div>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 800,
+            color: 'var(--ink3)',
+            textTransform: 'uppercase',
+            letterSpacing: '.1em',
+            marginBottom: 12,
+          }}
+        >
+          💰 {monthLabel(currentMonth)} — Sales Breakdown
+        </div>
+        <div className="erp-grid-3">
+          <Card icon='💵' label='Month Cash Sales' value={fmt(monthCashSales)} sub='Total cash collected' color='var(--green)' />
+          <Card icon='📲' label='Month UPI Sales' value={fmt(monthUpiSales)} sub='Total UPI / online' color='var(--blue)' />
+          <Card icon='📋' label='Month Credit Sales' value={fmt(monthCreditSales)} sub='Total billed on credit' color='var(--amber,#d97706)' />
+        </div>
+      </div>
+
+      {/* ── CASH & BANK ─────────────────────────────────── */}
+      <div>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 800,
+            color: 'var(--ink3)',
+            textTransform: 'uppercase',
+            letterSpacing: '.1em',
+            marginBottom: 12,
+          }}
+        >
+          🏦 Cash & Bank — Live Balances
+        </div>
+        <div className="erp-grid-3">
+          <HeroCard
+            icon='💵'
+            label='Cash in Hand'
+            value={fmt(currentCash)}
+            sub={`OB: ${fmt(cashOB)} · Closing balance`}
+            gradient={currentCash >= 0 ? 'linear-gradient(135deg,#16a34a,#15803d)' : 'linear-gradient(135deg,#dc2626,#b91c1c)'}
+            glow={currentCash >= 0 ? '0 8px 24px rgba(22,163,74,.25)' : '0 8px 24px rgba(220,38,38,.25)'}
+          />
+          <HeroCard
+            icon='🏦'
+            label='Bank Account'
+            value={fmt(currentBank)}
+            sub={`OB: ${fmt(bankOB)} · Closing balance`}
+            gradient={currentBank >= 0 ? 'linear-gradient(135deg,#2563eb,#1d4ed8)' : 'linear-gradient(135deg,#dc2626,#b91c1c)'}
+            glow={currentBank >= 0 ? '0 8px 24px rgba(37,99,235,.25)' : '0 8px 24px rgba(220,38,38,.25)'}
+          />
+          <HeroCard
+            icon='💼'
+            label='Total Funds'
+            value={fmt(currentCash + currentBank)}
+            sub={`Cash ${fmt(currentCash)} + Bank ${fmt(currentBank)}`}
+            gradient={currentCash + currentBank >= 0 ? 'linear-gradient(135deg,#7c3aed,#6d28d9)' : 'linear-gradient(135deg,#dc2626,#b91c1c)'}
+            glow={currentCash + currentBank >= 0 ? '0 8px 24px rgba(124,58,237,.25)' : '0 8px 24px rgba(220,38,38,.25)'}
+          />
+        </div>
       </div>
 
       {/* ── CYLINDER STOCK + CREDIT OUTSTANDING + INVENTORY ── */}

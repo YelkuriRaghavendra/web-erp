@@ -1,32 +1,88 @@
 import { Page, Modal, Field, Row, Btn } from '../../shared/components/ui';
 import { useAccounts, TXN_TYPES } from './useAccounts';
 
-// ── Small inline badge for transaction type ────────────────────
-const TxnBadge = ({ type }: { type: string }) => {
-  const def = TXN_TYPES.find(t => t.id === type);
-  const colorMap: Record<string, { bg: string; color: string }> = {
-    blue: { bg: 'var(--bluebg,#eff6ff)', color: 'var(--blue,#3b82f6)' },
-    green: { bg: 'var(--greenbg)', color: 'var(--green)' },
-    red: { bg: 'var(--redbg)', color: 'var(--red)' },
-    amber: { bg: 'var(--amberbg,#fffbeb)', color: 'var(--amber,#d97706)' },
-  };
-  const c = colorMap[def?.color ?? 'blue'];
-  return (
+const fmt = (n: number) => `₹${n.toLocaleString()}`;
+
+const LedgerRow = ({
+  label,
+  value,
+  sign,
+  isTotal,
+  color,
+}: {
+  label: string;
+  value: number;
+  sign?: '+' | '−';
+  isTotal?: boolean;
+  color?: string;
+}) => (
+  <div
+    style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: isTotal ? '10px 0 0' : '5px 0',
+      borderTop: isTotal ? '1.5px solid var(--border2)' : 'none',
+      marginTop: isTotal ? 6 : 0,
+    }}
+  >
     <span
       style={{
-        fontSize: 11,
-        fontWeight: 700,
-        padding: '3px 8px',
-        borderRadius: 6,
-        background: c.bg,
-        color: c.color,
-        whiteSpace: 'nowrap',
+        fontSize: isTotal ? 13 : 12,
+        fontWeight: isTotal ? 800 : 500,
+        color: isTotal ? 'var(--ink)' : 'var(--ink2)',
       }}
     >
-      {def?.icon ?? ''} {def?.label ?? type}
+      {sign && (
+        <span style={{ color: sign === '+' ? 'var(--green)' : 'var(--red)', marginRight: 4, fontWeight: 700 }}>
+          {sign}
+        </span>
+      )}
+      {label}
     </span>
-  );
-};
+    <span
+      style={{
+        fontFamily: "'JetBrains Mono',monospace",
+        fontWeight: isTotal ? 900 : 600,
+        fontSize: isTotal ? 16 : 12,
+        color: color ?? (isTotal ? 'var(--ink)' : value === 0 ? 'var(--ink3)' : 'var(--ink)'),
+      }}
+    >
+      {value === 0 && !isTotal ? '—' : fmt(value)}
+    </span>
+  </div>
+);
+
+const ActionBtn = ({
+  label,
+  sub,
+  color,
+  onClick,
+}: {
+  label: string;
+  sub: string;
+  color: string;
+  onClick: () => void;
+}) => (
+  <button
+    onClick={onClick}
+    style={{
+      flex: 1,
+      minWidth: 120,
+      padding: '12px 14px',
+      borderRadius: 10,
+      border: `1.5px solid`,
+      borderColor: `${color}33`,
+      background: `${color}0d`,
+      cursor: 'pointer',
+      textAlign: 'left',
+      fontFamily: "'Plus Jakarta Sans',sans-serif",
+    }}
+  >
+    <div style={{ fontSize: 13, fontWeight: 800, color }}>{label}</div>
+    <div style={{ fontSize: 11, color: 'var(--ink3)', marginTop: 2 }}>{sub}</div>
+  </button>
+);
 
 export const AccountsPage = () => {
   const {
@@ -40,12 +96,13 @@ export const AccountsPage = () => {
     mBankToCash,
     mExpCash,
     mExpBank,
-    todayCash,
-    todayUPI,
-    todayDeposits,
-    todayWithdrawals,
-    todayExpenses,
+    mAddToBank,
+    mAddToCash,
     currentMonth,
+    selectedMonth,
+    thisMonth,
+    prevMonth,
+    nextMonth,
     txnHistory,
     txnModal,
     txnForm,
@@ -61,428 +118,250 @@ export const AccountsPage = () => {
     setObModal,
   } = useAccounts();
 
-  // Month label
   const [y, m] = currentMonth.split('-');
   const monthLabel = new Date(+y, +m - 1, 1).toLocaleDateString('en-IN', {
     month: 'long',
     year: 'numeric',
   });
 
+  const MonthNav = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <button onClick={prevMonth} style={{ border: '1px solid var(--border)', background: 'var(--canvas)', borderRadius: 8, padding: '5px 11px', cursor: 'pointer', fontSize: 15, color: 'var(--ink2)' }}>‹</button>
+      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', minWidth: 100, textAlign: 'center' }}>{monthLabel}</span>
+      <button onClick={nextMonth} disabled={selectedMonth >= thisMonth} style={{ border: '1px solid var(--border)', background: 'var(--canvas)', borderRadius: 8, padding: '5px 11px', cursor: selectedMonth >= thisMonth ? 'not-allowed' : 'pointer', fontSize: 15, color: selectedMonth >= thisMonth ? 'var(--ink3)' : 'var(--ink2)', opacity: selectedMonth >= thisMonth ? 0.4 : 1 }}>›</button>
+    </div>
+  );
+
   const selectedType = TXN_TYPES.find(t => t.id === txnForm.type);
 
+  // Group TXN_TYPES for display
+  const TRANSFER_TYPES = TXN_TYPES.filter(t =>
+    ['CASH_TO_BANK', 'BANK_TO_CASH', 'ADD_TO_BANK', 'ADD_TO_CASH'].includes(t.id)
+  );
+  const EXPENSE_TYPES = TXN_TYPES.filter(t =>
+    ['EXPENSE_CASH', 'EXPENSE_BANK'].includes(t.id)
+  );
+
+  const fmtDate = (d: string) =>
+    new Date(d + 'T00:00:00').toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+
   return (
-    <Page title='Cash & Bank' subtitle={`Live balances for ${monthLabel}`}>
-      {/* ── Balance cards ─────────────────────────────────── */}
-      <div className="erp-grid-3" style={{ gap: 16 }}>
+    <Page title='Cash & Bank' subtitle={`Live balances · ${monthLabel}`} action={MonthNav}>
+
+      {/* ── Balance ledger cards ──────────────────────────── */}
+      <div className='erp-grid-2' style={{ gap: 16 }}>
+
         {/* Cash in Hand */}
         <div
           style={{
-            borderRadius: 16,
-            padding: '24px 28px',
-            background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-            boxShadow: '0 8px 24px rgba(22,163,74,.25)',
-            position: 'relative',
-            overflow: 'hidden',
+            background: 'var(--canvas)',
+            border: '1px solid var(--border)',
+            borderTop: '3px solid var(--green)',
+            borderRadius: 14,
+            padding: '22px 24px',
+            boxShadow: 'var(--shadow)',
           }}
         >
-          <div
-            style={{
-              position: 'absolute',
-              top: -20,
-              right: -20,
-              width: 80,
-              height: 80,
-              borderRadius: '50%',
-              background: 'rgba(255,255,255,.08)',
-            }}
-          />
-          <div style={{ fontSize: 28, marginBottom: 8 }}>💵</div>
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: 'rgba(255,255,255,.7)',
-              textTransform: 'uppercase',
-              letterSpacing: '.08em',
-              marginBottom: 6,
-            }}
-          >
-            Cash in Hand
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
+                Cash in Hand
+              </div>
+              <div
+                style={{
+                  fontSize: 32,
+                  fontWeight: 900,
+                  color: currentCash >= 0 ? 'var(--green)' : 'var(--red)',
+                  fontFamily: "'JetBrains Mono',monospace",
+                  lineHeight: 1.1,
+                  marginTop: 4,
+                }}
+              >
+                {fmt(currentCash)}
+              </div>
+            </div>
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: '50%',
+                background: 'var(--greenbg)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 22,
+              }}
+            >
+              💵
+            </div>
           </div>
-          <div
-            style={{
-              fontSize: 36,
-              fontWeight: 900,
-              color: '#fff',
-              fontFamily: "'JetBrains Mono',monospace",
-              lineHeight: 1,
-            }}
-          >
-            ₹{currentCash.toLocaleString()}
+
+          {/* Ledger breakdown */}
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 0 }}>
+            <LedgerRow label='Opening Balance' value={cashOB} />
+            <LedgerRow label='Cash Sales' value={mCashSales} sign='+' />
+            {mBankToCash > 0 && <LedgerRow label='Bank Withdrawals' value={mBankToCash} sign='+' />}
+            {mAddToCash > 0 && <LedgerRow label='Cash Added' value={mAddToCash} sign='+' />}
+            {mCashToBank > 0 && <LedgerRow label='Deposited to Bank' value={mCashToBank} sign='−' />}
+            {mExpCash > 0 && <LedgerRow label='Cash Expenses' value={mExpCash} sign='−' />}
+            <LedgerRow label='Closing Balance' value={currentCash} isTotal color={currentCash >= 0 ? 'var(--green)' : 'var(--red)'} />
           </div>
-          <div
-            style={{
-              fontSize: 11,
-              color: 'rgba(255,255,255,.55)',
-              marginTop: 8,
-            }}
-          >
-            OB ₹{cashOB.toLocaleString()} + Sales ₹{mCashSales.toLocaleString()}
+
+          {/* Cash actions */}
+          <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+            <ActionBtn
+              label='Deposit to Bank'
+              sub='Cash in hand → Bank'
+              color='var(--blue)'
+              onClick={() => openTxnModal('CASH_TO_BANK')}
+            />
+            <ActionBtn
+              label='Add Cash'
+              sub='Add external cash'
+              color='var(--green)'
+              onClick={() => openTxnModal('ADD_TO_CASH')}
+            />
           </div>
         </div>
 
         {/* Bank Account */}
         <div
           style={{
-            borderRadius: 16,
-            padding: '24px 28px',
-            background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-            boxShadow: '0 8px 24px rgba(37,99,235,.25)',
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              top: -20,
-              right: -20,
-              width: 80,
-              height: 80,
-              borderRadius: '50%',
-              background: 'rgba(255,255,255,.08)',
-            }}
-          />
-          <div style={{ fontSize: 28, marginBottom: 8 }}>🏦</div>
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: 'rgba(255,255,255,.7)',
-              textTransform: 'uppercase',
-              letterSpacing: '.08em',
-              marginBottom: 6,
-            }}
-          >
-            Bank Account
-          </div>
-          <div
-            style={{
-              fontSize: 36,
-              fontWeight: 900,
-              color: '#fff',
-              fontFamily: "'JetBrains Mono',monospace",
-              lineHeight: 1,
-            }}
-          >
-            ₹{currentBank.toLocaleString()}
-          </div>
-          <div
-            style={{
-              fontSize: 11,
-              color: 'rgba(255,255,255,.55)',
-              marginTop: 8,
-            }}
-          >
-            OB ₹{bankOB.toLocaleString()} + UPI ₹{mUpiSales.toLocaleString()}
-          </div>
-        </div>
-
-        {/* Total */}
-        <div
-          style={{
-            borderRadius: 16,
-            padding: '24px 28px',
-            background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-            boxShadow: '0 8px 24px rgba(124,58,237,.25)',
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              top: -20,
-              right: -20,
-              width: 80,
-              height: 80,
-              borderRadius: '50%',
-              background: 'rgba(255,255,255,.08)',
-            }}
-          />
-          <div style={{ fontSize: 28, marginBottom: 8 }}>💼</div>
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: 'rgba(255,255,255,.7)',
-              textTransform: 'uppercase',
-              letterSpacing: '.08em',
-              marginBottom: 6,
-            }}
-          >
-            Total Funds
-          </div>
-          <div
-            style={{
-              fontSize: 36,
-              fontWeight: 900,
-              color: '#fff',
-              fontFamily: "'JetBrains Mono',monospace",
-              lineHeight: 1,
-            }}
-          >
-            ₹{(currentCash + currentBank).toLocaleString()}
-          </div>
-          <div
-            style={{
-              fontSize: 11,
-              color: 'rgba(255,255,255,.55)',
-              marginTop: 8,
-            }}
-          >
-            Cash + Bank combined
-          </div>
-        </div>
-      </div>
-
-      {/* ── Today's activity + Month summary ─────────────── */}
-      <div className="erp-grid-2" style={{ gap: 16 }}>
-        {/* Today */}
-        <div
-          style={{
             background: 'var(--canvas)',
             border: '1px solid var(--border)',
+            borderTop: '3px solid var(--blue)',
             borderRadius: 14,
-            padding: '20px 24px',
+            padding: '22px 24px',
             boxShadow: 'var(--shadow)',
           }}
         >
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 800,
-              color: 'var(--ink)',
-              marginBottom: 14,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            📅 Today's Activity
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {[
-              {
-                label: 'Cash Sales',
-                value: todayCash,
-                color: 'var(--green)',
-                icon: '💵',
-              },
-              {
-                label: 'UPI Sales',
-                value: todayUPI,
-                color: 'var(--blue)',
-                icon: '📲',
-              },
-              {
-                label: 'Deposits',
-                value: todayDeposits,
-                color: 'var(--blue)',
-                icon: '⬆',
-              },
-              {
-                label: 'Withdrawals',
-                value: todayWithdrawals,
-                color: 'var(--green)',
-                icon: '⬇',
-              },
-              {
-                label: 'Expenses',
-                value: todayExpenses,
-                color: 'var(--red)',
-                icon: '📤',
-              },
-            ].map(r => (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
+                Bank Account
+              </div>
               <div
-                key={r.label}
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
+                  fontSize: 32,
+                  fontWeight: 900,
+                  color: currentBank >= 0 ? 'var(--blue)' : 'var(--red)',
+                  fontFamily: "'JetBrains Mono',monospace",
+                  lineHeight: 1.1,
+                  marginTop: 4,
                 }}
               >
-                <span style={{ fontSize: 13, color: 'var(--ink2)' }}>
-                  {r.icon} {r.label}
-                </span>
-                <span
-                  style={{
-                    fontFamily: "'JetBrains Mono',monospace",
-                    fontWeight: 700,
-                    fontSize: 13,
-                    color: r.value > 0 ? r.color : 'var(--ink3)',
-                  }}
-                >
-                  {r.value > 0 ? `₹${r.value.toLocaleString()}` : '—'}
-                </span>
+                {fmt(currentBank)}
               </div>
-            ))}
+            </div>
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: '50%',
+                background: 'var(--bluebg)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 22,
+              }}
+            >
+              🏦
+            </div>
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 0 }}>
+            <LedgerRow label='Opening Balance' value={bankOB} />
+            <LedgerRow label='UPI / Online Sales' value={mUpiSales} sign='+' />
+            {mCashToBank > 0 && <LedgerRow label='Cash Deposited' value={mCashToBank} sign='+' />}
+            {mAddToBank > 0 && <LedgerRow label='Cash Added to Bank' value={mAddToBank} sign='+' />}
+            {mBankToCash > 0 && <LedgerRow label='Withdrawn to Cash' value={mBankToCash} sign='−' />}
+            {mExpBank > 0 && <LedgerRow label='Bank Expenses' value={mExpBank} sign='−' />}
+            <LedgerRow label='Closing Balance' value={currentBank} isTotal color={currentBank >= 0 ? 'var(--blue)' : 'var(--red)'} />
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+            <ActionBtn
+              label='Add to Bank'
+              sub='Deposit cash to bank'
+              color='var(--blue)'
+              onClick={() => openTxnModal('ADD_TO_BANK')}
+            />
+            <ActionBtn
+              label='Withdraw'
+              sub='Bank → Cash in hand'
+              color='var(--green)'
+              onClick={() => openTxnModal('BANK_TO_CASH')}
+            />
           </div>
         </div>
+      </div>
 
-        {/* Month summary */}
+      {/* ── Total Funds + OB button ───────────────────────── */}
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <div
           style={{
-            background: 'var(--canvas)',
-            border: '1px solid var(--border)',
+            flex: 1,
+            background: 'linear-gradient(135deg,#7c3aed,#6d28d9)',
             borderRadius: 14,
-            padding: '20px 24px',
-            boxShadow: 'var(--shadow)',
+            padding: '18px 24px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            boxShadow: '0 6px 20px rgba(124,58,237,.2)',
           }}
         >
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 800,
-              color: 'var(--ink)',
-              marginBottom: 14,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            📊 {monthLabel} Summary
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.65)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
+              Total Funds
+            </div>
+            <div style={{ fontSize: 28, fontWeight: 900, color: '#fff', fontFamily: "'JetBrains Mono',monospace", lineHeight: 1.1, marginTop: 4 }}>
+              {fmt(currentCash + currentBank)}
+            </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {[
-              {
-                label: 'Cash Sales',
-                value: mCashSales,
-                color: 'var(--green)',
-                icon: '💵',
-              },
-              {
-                label: 'UPI / Bank',
-                value: mUpiSales,
-                color: 'var(--blue)',
-                icon: '🏦',
-              },
-              {
-                label: 'Deposited',
-                value: mCashToBank,
-                color: 'var(--blue)',
-                icon: '⬆',
-              },
-              {
-                label: 'Withdrawn',
-                value: mBankToCash,
-                color: 'var(--green)',
-                icon: '⬇',
-              },
-              {
-                label: 'Cash Expenses',
-                value: mExpCash,
-                color: 'var(--red)',
-                icon: '💸',
-              },
-              {
-                label: 'Bank Expenses',
-                value: mExpBank,
-                color: 'var(--red)',
-                icon: '🏦📤',
-              },
-            ].map(r => (
-              <div
-                key={r.label}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <span style={{ fontSize: 13, color: 'var(--ink2)' }}>
-                  {r.icon} {r.label}
-                </span>
-                <span
-                  style={{
-                    fontFamily: "'JetBrains Mono',monospace",
-                    fontWeight: 700,
-                    fontSize: 13,
-                    color: r.value > 0 ? r.color : 'var(--ink3)',
-                  }}
-                >
-                  {r.value > 0 ? `₹${r.value.toLocaleString()}` : '—'}
-                </span>
-              </div>
-            ))}
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)', textAlign: 'right' }}>
+            <div>Cash {fmt(currentCash)}</div>
+            <div>Bank {fmt(currentBank)}</div>
           </div>
         </div>
-      </div>
-
-      {/* ── Quick-action buttons ──────────────────────────── */}
-      <div>
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 800,
-            color: 'var(--ink)',
-            marginBottom: 12,
-          }}
-        >
-          Quick Actions
-        </div>
-        <div className="erp-grid-4" style={{ gap: 12 }}>
-          {TXN_TYPES.map(t => {
-            const bgMap: Record<string, string> = {
-              blue: 'linear-gradient(135deg,#2563eb,#1d4ed8)',
-              green: 'linear-gradient(135deg,#16a34a,#15803d)',
-              red: 'linear-gradient(135deg,#dc2626,#b91c1c)',
-              amber: 'linear-gradient(135deg,#d97706,#b45309)',
-            };
-            return (
-              <button
-                key={t.id}
-                onClick={() => openTxnModal(t.id)}
-                style={{
-                  padding: '16px 12px',
-                  borderRadius: 12,
-                  border: 'none',
-                  background: bgMap[t.color],
-                  color: '#fff',
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  boxShadow: '0 4px 12px rgba(0,0,0,.15)',
-                  fontFamily: "'Plus Jakarta Sans',sans-serif",
-                }}
-              >
-                <div style={{ fontSize: 24, marginBottom: 6 }}>{t.icon}</div>
-                <div style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.3 }}>
-                  {t.label}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── Set Opening Balance ───────────────────────────── */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <button
           onClick={openOBModal}
           style={{
+            padding: '12px 18px',
+            borderRadius: 10,
+            border: '1px solid var(--border2)',
+            background: 'var(--canvas)',
             fontSize: 13,
-            fontWeight: 600,
-            color: 'var(--ink3)',
-            background: 'none',
-            border: '1px solid var(--border)',
-            borderRadius: 8,
-            padding: '7px 14px',
+            fontWeight: 700,
+            color: 'var(--ink2)',
             cursor: 'pointer',
             fontFamily: "'Plus Jakarta Sans',sans-serif",
+            whiteSpace: 'nowrap',
           }}
         >
-          ⚙ Set Opening Balance — {monthLabel}
+          ⚙ Opening Balance
         </button>
+      </div>
+
+      {/* ── Expense quick actions ─────────────────────────── */}
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10 }}>
+          Record Expense
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {EXPENSE_TYPES.map(t => (
+            <ActionBtn
+              key={t.id}
+              label={t.label}
+              sub={t.id === 'EXPENSE_CASH' ? 'Deduct from cash' : 'Deduct from bank'}
+              color='var(--red)'
+              onClick={() => openTxnModal(t.id)}
+            />
+          ))}
+        </div>
       </div>
 
       {/* ── Transaction history ───────────────────────────── */}
@@ -507,303 +386,148 @@ export const AccountsPage = () => {
           <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>
             Transaction History
           </div>
-          <span style={{ fontSize: 11, color: 'var(--ink3)', fontWeight: 600 }}>
+          <span style={{ fontSize: 11, color: 'var(--ink3)', fontWeight: 600, background: 'var(--bg)', padding: '3px 10px', borderRadius: 99 }}>
             {txnHistory.length} entries
           </span>
         </div>
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        <table
-          style={{ width: '100%', minWidth: 440, borderCollapse: 'collapse', fontSize: 13 }}
-        >
-          <thead>
-            <tr style={{ background: 'var(--bg)' }}>
-              {[
-                'Date',
-                'Type',
-                'Note',
-                'Cash Effect',
-                'Bank Effect',
-                'Amount',
-              ].map(h => (
-                <th
-                  key={h}
-                  style={{
-                    padding: '10px 16px',
-                    textAlign: [
-                      'Cash Effect',
-                      'Bank Effect',
-                      'Amount',
-                    ].includes(h)
-                      ? 'right'
-                      : 'left',
-                    color: 'var(--ink3)',
-                    fontWeight: 700,
-                    fontSize: 11,
-                    textTransform: 'uppercase',
-                    letterSpacing: '.06em',
-                    borderBottom: '1px solid var(--border)',
-                  }}
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {txnHistory.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={6}
-                  style={{
-                    padding: '48px',
-                    textAlign: 'center',
-                    color: 'var(--ink3)',
-                  }}
-                >
-                  <div style={{ fontSize: 32, marginBottom: 10 }}>📭</div>
-                  No transactions yet. Use the quick-action buttons above to
-                  record one.
-                </td>
-              </tr>
-            ) : (
-              txnHistory.map((t, i) => {
-                const def = TXN_TYPES.find(x => x.id === t.type)!;
-                const cashEff = def.cashEffect * t.amount;
-                const bankEff = def.bankEffect * t.amount;
-                return (
-                  <tr
-                    key={t.id}
+          <table style={{ width: '100%', minWidth: 520, borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: 'var(--bg)' }}>
+                {['Date', 'Type', 'Note', 'Cash Effect', 'Bank Effect', 'Amount'].map(h => (
+                  <th
+                    key={h}
                     style={{
-                      borderBottom:
-                        i < txnHistory.length - 1
-                          ? '1px solid var(--border)'
-                          : 'none',
+                      padding: '10px 16px',
+                      textAlign: ['Cash Effect', 'Bank Effect', 'Amount'].includes(h) ? 'right' : 'left',
+                      color: 'var(--ink3)',
+                      fontWeight: 700,
+                      fontSize: 11,
+                      textTransform: 'uppercase',
+                      letterSpacing: '.06em',
+                      borderBottom: '1px solid var(--border)',
+                      whiteSpace: 'nowrap',
                     }}
-                    onMouseEnter={e =>
-                      (e.currentTarget.style.background = 'var(--bg)')
-                    }
-                    onMouseLeave={e =>
-                      (e.currentTarget.style.background = 'var(--canvas)')
-                    }
                   >
-                    <td
-                      style={{
-                        padding: '11px 16px',
-                        color: 'var(--ink3)',
-                        fontSize: 12,
-                        fontFamily: "'JetBrains Mono',monospace",
-                      }}
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {txnHistory.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: 'var(--ink3)' }}>
+                    <div style={{ fontSize: 32, marginBottom: 10 }}>📭</div>
+                    No transactions yet. Use the action buttons above.
+                  </td>
+                </tr>
+              ) : (
+                txnHistory.map((t, i) => {
+                  const def = TXN_TYPES.find(x => x.id === t.type);
+                  const cashEff = (def?.cashEffect ?? 0) * t.amount;
+                  const bankEff = (def?.bankEffect ?? 0) * t.amount;
+                  const colorMap: Record<string, { bg: string; color: string }> = {
+                    blue: { bg: 'var(--bluebg)', color: 'var(--blue)' },
+                    green: { bg: 'var(--greenbg)', color: 'var(--green)' },
+                    red: { bg: 'var(--redbg)', color: 'var(--red)' },
+                    amber: { bg: 'var(--amberbg)', color: 'var(--amber)' },
+                  };
+                  const c = colorMap[def?.color ?? 'blue'];
+                  return (
+                    <tr
+                      key={t.id}
+                      style={{ borderBottom: i < txnHistory.length - 1 ? '1px solid var(--border)' : 'none' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'var(--canvas)')}
                     >
-                      {t.date}
-                    </td>
-                    <td style={{ padding: '11px 16px' }}>
-                      <TxnBadge type={t.type} />
-                    </td>
-                    <td style={{ padding: '11px 16px', color: 'var(--ink2)' }}>
-                      {t.note || (
-                        <span
-                          style={{ color: 'var(--ink3)', fontStyle: 'italic' }}
-                        >
-                          —
+                      <td style={{ padding: '11px 16px', color: 'var(--ink3)', fontSize: 12, fontFamily: "'JetBrains Mono',monospace", whiteSpace: 'nowrap' }}>
+                        {fmtDate(t.date)}
+                      </td>
+                      <td style={{ padding: '11px 16px' }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: c.bg, color: c.color, whiteSpace: 'nowrap' }}>
+                          {def?.icon ?? ''} {def?.label ?? t.type}
                         </span>
-                      )}
-                    </td>
-                    <td
-                      style={{
-                        padding: '11px 16px',
-                        textAlign: 'right',
-                        fontFamily: "'JetBrains Mono',monospace",
-                        fontWeight: 700,
-                        color:
-                          cashEff > 0
-                            ? 'var(--green)'
-                            : cashEff < 0
-                              ? 'var(--red)'
-                              : 'var(--ink3)',
-                      }}
-                    >
-                      {cashEff !== 0
-                        ? `${cashEff > 0 ? '+' : ''}₹${Math.abs(cashEff).toLocaleString()}`
-                        : '—'}
-                    </td>
-                    <td
-                      style={{
-                        padding: '11px 16px',
-                        textAlign: 'right',
-                        fontFamily: "'JetBrains Mono',monospace",
-                        fontWeight: 700,
-                        color:
-                          bankEff > 0
-                            ? 'var(--blue)'
-                            : bankEff < 0
-                              ? 'var(--red)'
-                              : 'var(--ink3)',
-                      }}
-                    >
-                      {bankEff !== 0
-                        ? `${bankEff > 0 ? '+' : ''}₹${Math.abs(bankEff).toLocaleString()}`
-                        : '—'}
-                    </td>
-                    <td
-                      style={{
-                        padding: '11px 16px',
-                        textAlign: 'right',
-                        fontFamily: "'JetBrains Mono',monospace",
-                        fontWeight: 800,
-                      }}
-                    >
-                      ₹{t.amount.toLocaleString()}
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                      </td>
+                      <td style={{ padding: '11px 16px', color: 'var(--ink2)', maxWidth: 200 }}>
+                        {t.note || <span style={{ color: 'var(--ink3)', fontStyle: 'italic' }}>—</span>}
+                      </td>
+                      <td style={{ padding: '11px 16px', textAlign: 'right', fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, color: cashEff > 0 ? 'var(--green)' : cashEff < 0 ? 'var(--red)' : 'var(--ink3)', whiteSpace: 'nowrap' }}>
+                        {cashEff !== 0 ? `${cashEff > 0 ? '+' : ''}${fmt(Math.abs(cashEff))}` : '—'}
+                      </td>
+                      <td style={{ padding: '11px 16px', textAlign: 'right', fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, color: bankEff > 0 ? 'var(--blue)' : bankEff < 0 ? 'var(--red)' : 'var(--ink3)', whiteSpace: 'nowrap' }}>
+                        {bankEff !== 0 ? `${bankEff > 0 ? '+' : ''}${fmt(Math.abs(bankEff))}` : '—'}
+                      </td>
+                      <td style={{ padding: '11px 16px', textAlign: 'right', fontFamily: "'JetBrains Mono',monospace", fontWeight: 800, whiteSpace: 'nowrap' }}>
+                        {fmt(t.amount)}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
       {/* ── Transaction entry modal ────────────────────────── */}
       {txnModal && (
-        <Modal
-          title='Record Transaction'
-          onClose={() => setTxnModal(false)}
-          width={480}
-        >
-          {/* Type selector */}
-          <div
-            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}
-          >
-            {TXN_TYPES.map(t => {
-              const active = txnForm.type === t.id;
-              const accentMap: Record<string, string> = {
-                blue: 'var(--blue,#3b82f6)',
-                green: 'var(--green)',
-                red: 'var(--red)',
-                amber: 'var(--amber,#d97706)',
-              };
-              const bgMap: Record<string, string> = {
-                blue: 'var(--bluebg,#eff6ff)',
-                green: 'var(--greenbg)',
-                red: 'var(--redbg)',
-                amber: 'var(--amberbg,#fffbeb)',
-              };
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setTxnField('type', t.id)}
-                  style={{
-                    padding: '12px',
-                    borderRadius: 10,
-                    cursor: 'pointer',
-                    border: `2px solid ${active ? accentMap[t.color] : 'var(--border)'}`,
-                    background: active ? bgMap[t.color] : 'var(--canvas)',
-                    fontWeight: 700,
-                    fontSize: 12,
-                    color: active ? accentMap[t.color] : 'var(--ink3)',
-                    fontFamily: "'Plus Jakarta Sans',sans-serif",
-                    textAlign: 'center',
-                  }}
-                >
-                  <div style={{ fontSize: 22, marginBottom: 4 }}>{t.icon}</div>
-                  {t.label}
-                </button>
-              );
-            })}
+        <Modal title='Record Transaction' onClose={() => setTxnModal(false)} width={500}>
+          {/* Type groups */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 4 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>
+                Transfer / Add
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+                {TRANSFER_TYPES.map(t => {
+                  const active = txnForm.type === t.id;
+                  const accentMap: Record<string, string> = { blue: 'var(--blue)', green: 'var(--green)', red: 'var(--red)', amber: 'var(--amber)' };
+                  const bgMap: Record<string, string> = { blue: 'var(--bluebg)', green: 'var(--greenbg)', red: 'var(--redbg)', amber: 'var(--amberbg)' };
+                  return (
+                    <button key={t.id} onClick={() => setTxnField('type', t.id)} style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer', border: `2px solid ${active ? accentMap[t.color] : 'var(--border)'}`, background: active ? bgMap[t.color] : 'var(--canvas)', fontWeight: 700, fontSize: 12, color: active ? accentMap[t.color] : 'var(--ink3)', fontFamily: "'Plus Jakarta Sans',sans-serif", textAlign: 'center' }}>
+                      <div style={{ fontSize: 20, marginBottom: 3 }}>{t.icon}</div>
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>
+                Expenses
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+                {EXPENSE_TYPES.map(t => {
+                  const active = txnForm.type === t.id;
+                  const accentMap: Record<string, string> = { blue: 'var(--blue)', green: 'var(--green)', red: 'var(--red)', amber: 'var(--amber)' };
+                  const bgMap: Record<string, string> = { blue: 'var(--bluebg)', green: 'var(--greenbg)', red: 'var(--redbg)', amber: 'var(--amberbg)' };
+                  return (
+                    <button key={t.id} onClick={() => setTxnField('type', t.id)} style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer', border: `2px solid ${active ? accentMap[t.color] : 'var(--border)'}`, background: active ? bgMap[t.color] : 'var(--canvas)', fontWeight: 700, fontSize: 12, color: active ? accentMap[t.color] : 'var(--ink3)', fontFamily: "'Plus Jakarta Sans',sans-serif", textAlign: 'center' }}>
+                      <div style={{ fontSize: 20, marginBottom: 3 }}>{t.icon}</div>
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           {/* Effect preview */}
           {selectedType && (
-            <div
-              style={{
-                padding: '10px 14px',
-                borderRadius: 8,
-                background: 'var(--bg)',
-                border: '1px solid var(--border)',
-                fontSize: 12,
-                color: 'var(--ink3)',
-                display: 'flex',
-                gap: 16,
-              }}
-            >
-              <span>
-                💵 Cash:{' '}
-                <strong
-                  style={{
-                    color:
-                      selectedType.cashEffect > 0
-                        ? 'var(--green)'
-                        : selectedType.cashEffect < 0
-                          ? 'var(--red)'
-                          : 'var(--ink3)',
-                  }}
-                >
-                  {selectedType.cashEffect > 0
-                    ? '+'
-                    : selectedType.cashEffect < 0
-                      ? '-'
-                      : '±'}
-                  0
-                </strong>
-              </span>
-              <span>
-                🏦 Bank:{' '}
-                <strong
-                  style={{
-                    color:
-                      selectedType.bankEffect > 0
-                        ? 'var(--blue)'
-                        : selectedType.bankEffect < 0
-                          ? 'var(--red)'
-                          : 'var(--ink3)',
-                  }}
-                >
-                  {selectedType.bankEffect > 0
-                    ? '+'
-                    : selectedType.bankEffect < 0
-                      ? '-'
-                      : '±'}
-                  0
-                </strong>
-              </span>
+            <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)', fontSize: 12, color: 'var(--ink3)', display: 'flex', gap: 20 }}>
+              <span>💵 Cash: <strong style={{ color: selectedType.cashEffect > 0 ? 'var(--green)' : selectedType.cashEffect < 0 ? 'var(--red)' : 'var(--ink3)' }}>{selectedType.cashEffect > 0 ? '+' : selectedType.cashEffect < 0 ? '−' : '±'}0</strong></span>
+              <span>🏦 Bank: <strong style={{ color: selectedType.bankEffect > 0 ? 'var(--blue)' : selectedType.bankEffect < 0 ? 'var(--red)' : 'var(--ink3)' }}>{selectedType.bankEffect > 0 ? '+' : selectedType.bankEffect < 0 ? '−' : '±'}0</strong></span>
             </div>
           )}
 
           <Row>
-            <Field
-              label='Date'
-              type='date'
-              value={txnForm.date}
-              onChange={v => setTxnField('date', v)}
-            />
-            <Field
-              label='Amount (₹)'
-              type='number'
-              value={txnForm.amount}
-              onChange={v => setTxnField('amount', v)}
-              placeholder='0'
-              required
-            />
+            <Field label='Date' type='date' value={txnForm.date} onChange={v => setTxnField('date', v)} />
+            <Field label='Amount (₹)' type='number' value={txnForm.amount} onChange={v => setTxnField('amount', v)} placeholder='0' required />
           </Row>
-          <Field
-            label='Note / Description'
-            value={txnForm.note}
-            onChange={v => setTxnField('note', v)}
-            placeholder='Optional description…'
-          />
-          <div
-            style={{
-              display: 'flex',
-              gap: 10,
-              justifyContent: 'flex-end',
-              borderTop: '1px solid var(--border)',
-              paddingTop: 14,
-              marginTop: 4,
-            }}
-          >
-            <Btn variant='ghost' onClick={() => setTxnModal(false)}>
-              Cancel
-            </Btn>
+          <Field label='Note / Description' value={txnForm.note} onChange={v => setTxnField('note', v)} placeholder='Optional description…' />
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 4 }}>
+            <Btn variant='ghost' onClick={() => setTxnModal(false)}>Cancel</Btn>
             <Btn onClick={addTransaction}>Record Transaction</Btn>
           </div>
         </Modal>
@@ -811,44 +535,16 @@ export const AccountsPage = () => {
 
       {/* ── Opening Balance modal ──────────────────────────── */}
       {obModal && (
-        <Modal
-          title={`Opening Balance — ${monthLabel}`}
-          onClose={() => setObModal(false)}
-          width={380}
-        >
-          <div
-            style={{
-              fontSize: 13,
-              color: 'var(--ink3)',
-              padding: '10px 14px',
-              background: 'var(--bg)',
-              borderRadius: 8,
-              border: '1px solid var(--border)',
-            }}
-          >
-            Set the starting cash and bank balance for {monthLabel}. This is the
-            amount you had at the beginning of the month.
+        <Modal title={`Opening Balance — ${monthLabel}`} onClose={() => setObModal(false)} width={400}>
+          <div style={{ fontSize: 13, color: 'var(--ink3)', padding: '10px 14px', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)' }}>
+            Set the starting cash and bank balance at the beginning of {monthLabel}.
           </div>
           <Row>
-            <Field
-              label='Cash Opening (₹)'
-              type='number'
-              value={obForm.cash}
-              onChange={v => setObForm(p => ({ ...p, cash: v }))}
-              placeholder='0'
-            />
-            <Field
-              label='Bank Opening (₹)'
-              type='number'
-              value={obForm.bank}
-              onChange={v => setObForm(p => ({ ...p, bank: v }))}
-              placeholder='0'
-            />
+            <Field label='Cash Opening (₹)' type='number' value={obForm.cash} onChange={v => setObForm(p => ({ ...p, cash: v }))} placeholder='0' />
+            <Field label='Bank Opening (₹)' type='number' value={obForm.bank} onChange={v => setObForm(p => ({ ...p, bank: v }))} placeholder='0' />
           </Row>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-            <Btn variant='ghost' onClick={() => setObModal(false)}>
-              Cancel
-            </Btn>
+            <Btn variant='ghost' onClick={() => setObModal(false)}>Cancel</Btn>
             <Btn onClick={saveOB}>Save Opening Balances</Btn>
           </div>
         </Modal>

@@ -1,6 +1,6 @@
 // ── Gas Agency ERP — TypeScript types ───────────────────────
 
-export type Role = 'Admin' | 'Staff' | 'Viewer';
+export type Role = 'Admin' | 'Billing';
 
 // All navigable page ids — single source of truth
 export type PageId =
@@ -24,22 +24,42 @@ export interface ERPUser {
 
 // ── Staff (persisted users with role management) ──────────────
 export interface StaffUser extends ERPUser {
-  id: string; // UUID
+  id: string; // bigserial as string
   p: string; // SHA-256 hash
   active: boolean;
   createdAt: number;
+  // audit
+  updatedAt?: number;
+  createdBy?: string;
+  updatedBy?: string;
 }
+
+// ── Item behaviour — stored in DB, drives purchase/billing logic ─
+// 'regular'  → own stock; appears in purchase + billing
+// 'cylinder' → own stock; shown in Cylinders section; purchase + billing
+// 'linked'   → NO own stock; draws from stockSourceId when billed;
+//              NEVER shown in the purchase form
+export type ItemType = 'regular' | 'cylinder' | 'linked';
 
 // ── Item Master ──────────────────────────────────────────────
 export interface Item {
-  id: string; // UUID (maps to item_id in DB)
+  id: string;           // bigserial as string (maps to item_id in DB)
   name: string;
   unit: string;
   price: number;
   active: boolean;
+  itemType: ItemType;          // maps to item_type in DB
+  stockSourceId: string | null; // maps to stock_source_id; set only for 'linked' items
+  // audit
+  createdAt?: number;
+  updatedAt?: number;
+  createdBy?: string;
+  updatedBy?: string;
 }
 
-// ── Stock  (keyed by item UUID) ──────────────────────────────
+// ── Stock  (keyed by item id) ────────────────────────────────
+// Stock is a live snapshot; audit is stored in DB but not surfaced
+// in TypeScript to keep the Record shape simple.
 export type Stock = Record<string, { qty: number }>;
 
 // ── Customers ────────────────────────────────────────────────
@@ -53,7 +73,7 @@ export interface LedgerEntry {
 }
 
 export interface Customer {
-  id: string; // UUID (maps to customer_id in DB)
+  id: string; // bigserial as string (maps to customer_id in DB)
   name: string;
   phone: string;
   address: string;
@@ -61,11 +81,16 @@ export interface Customer {
   outstanding: number;
   joinDate: string; // YYYY-MM-DD
   ledger?: LedgerEntry[];
+  // audit
+  createdAt?: number;
+  updatedAt?: number;
+  createdBy?: string;
+  updatedBy?: string;
 }
 
 // ── Bills ────────────────────────────────────────────────────
 export interface BillLine {
-  itemId: string; // UUID (maps to item_id in DB)
+  itemId: string; // bigserial as string (maps to item_id in DB)
   itemName: string;
   qty: number;
   price: number;
@@ -75,17 +100,22 @@ export interface BillLine {
 export interface Bill {
   id: string;    // "INV-YYMMDD-NNN" (maps to bill_id in DB — text column)
   date: string;
-  customerId: string | null; // UUID
+  customerId: string | null;
   customerName: string;
   payment: 'Cash' | 'UPI' | 'Credit';
   total: number;
   note: string;
   lines: BillLine[];
+  // audit
+  createdAt?: number;
+  updatedAt?: number;
+  createdBy?: string;
+  updatedBy?: string;
 }
 
 // ── Purchases ────────────────────────────────────────────────
 export interface PurchaseLine {
-  itemId: string; // UUID
+  itemId: string; // bigserial as string
   itemName: string;
   qty: number;
   rate: number;
@@ -93,11 +123,16 @@ export interface PurchaseLine {
 }
 
 export interface Purchase {
-  id: string; // "P001" (maps to purchase_id in DB)
+  id: string; // "PO-YYMMDD-NNN" (maps to purchase_id in DB — text column)
   date: string;
   note: string;
   grandTotal: number;
   lines: PurchaseLine[];
+  // audit
+  createdAt?: number;
+  updatedAt?: number;
+  createdBy?: string;
+  updatedBy?: string;
 }
 
 // ── Reports ──────────────────────────────────────────────────
@@ -105,17 +140,35 @@ export type TxnType =
   | 'CASH_TO_BANK'
   | 'BANK_TO_CASH'
   | 'EXPENSE_CASH'
-  | 'EXPENSE_BANK';
+  | 'EXPENSE_BANK'
+  | 'ADD_TO_BANK'
+  | 'ADD_TO_CASH';
 
 export interface Transaction {
-  id: string; // UUID (maps to transaction_id in DB)
+  id: string; // bigserial as string (maps to transaction_id in DB)
   date: string;
   type: TxnType;
   amount: number;
   note: string;
+  // audit
+  createdAt?: number;
+  updatedAt?: number;
+  createdBy?: string;
+  updatedBy?: string;
 }
 
-export type OpeningBalances = Record<string, { cash: number; bank: number }>;
+// ── Opening Balances ─────────────────────────────────────────
+export interface OpeningBalance {
+  cash: number;
+  bank: number;
+  // audit
+  createdAt?: number;
+  updatedAt?: number;
+  createdBy?: string;
+  updatedBy?: string;
+}
+
+export type OpeningBalances = Record<string, OpeningBalance>;
 
 // ── Top-level store state ────────────────────────────────────
 export interface ERPState {

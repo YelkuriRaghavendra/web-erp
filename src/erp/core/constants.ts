@@ -1,8 +1,5 @@
 import type { Role, PageId } from './types';
 
-// Detect cylinder items by name — works regardless of ID type
-export const isCylinder = (name: string) => /\d+\s*kg\s*cylinder/i.test(name);
-
 // Navigation — sidebar items with role guards + URL paths
 export const NAV = [
   {
@@ -10,49 +7,49 @@ export const NAV = [
     path: '/',
     icon: '▦',
     label: 'Dashboard',
-    roles: ['Admin', 'Staff', 'Viewer'] as Role[],
+    roles: ['Admin'] as Role[],
   },
   {
     id: 'billing' as PageId,
     path: '/billing',
     icon: '🧾',
     label: 'Billing',
-    roles: ['Admin', 'Staff'] as Role[],
+    roles: ['Admin', 'Billing'] as Role[],
   },
   {
     id: 'purchase' as PageId,
     path: '/purchase',
     icon: '⊞',
     label: 'Purchase',
-    roles: ['Admin', 'Staff'] as Role[],
+    roles: ['Admin', 'Billing'] as Role[],
   },
   {
     id: 'customers' as PageId,
     path: '/customers',
     icon: '👥',
     label: 'Customers',
-    roles: ['Admin', 'Staff'] as Role[],
+    roles: ['Admin'] as Role[],
   },
   {
     id: 'ledger' as PageId,
     path: '/ledger',
     icon: '⊟',
     label: 'Credit Ledger',
-    roles: ['Admin', 'Staff'] as Role[],
+    roles: ['Admin', 'Billing'] as Role[],
   },
   {
     id: 'accounts' as PageId,
     path: '/accounts',
     icon: '💰',
     label: 'Cash & Bank',
-    roles: ['Admin', 'Staff', 'Viewer'] as Role[],
+    roles: ['Admin'] as Role[],
   },
   {
     id: 'reports' as PageId,
     path: '/reports',
     icon: '◫',
     label: 'Reports',
-    roles: ['Admin', 'Staff', 'Viewer'] as Role[],
+    roles: ['Admin'] as Role[],
   },
   {
     id: 'items' as PageId,
@@ -72,13 +69,13 @@ export const NAV = [
 
 // Strongly-typed role map — PageId keys, Role[] values
 export const PAGE_ROLES: Record<PageId, Role[]> = {
-  dashboard: ['Admin', 'Staff', 'Viewer'],
-  billing: ['Admin', 'Staff'],
-  purchase: ['Admin', 'Staff'],
-  customers: ['Admin', 'Staff'],
-  ledger: ['Admin', 'Staff'],
-  accounts: ['Admin', 'Staff', 'Viewer'],
-  reports: ['Admin', 'Staff', 'Viewer'],
+  dashboard: ['Admin'],
+  billing: ['Admin', 'Billing'],
+  purchase: ['Admin', 'Billing'],
+  customers: ['Admin'],
+  ledger: ['Admin', 'Billing'],
+  accounts: ['Admin'],
+  reports: ['Admin'],
   items: ['Admin'],
   staff: ['Admin'],
 };

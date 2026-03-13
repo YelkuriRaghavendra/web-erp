@@ -39,6 +39,22 @@ export const TXN_TYPES = [
     bankEffect: -1,
     color: 'amber',
   },
+  {
+    id: 'ADD_TO_BANK' as TxnType,
+    label: 'Add Cash to Bank',
+    icon: '💰→🏦',
+    cashEffect: 0,
+    bankEffect: +1,
+    color: 'blue',
+  },
+  {
+    id: 'ADD_TO_CASH' as TxnType,
+    label: 'Add Cash in Hand',
+    icon: '💰',
+    cashEffect: +1,
+    bankEffect: 0,
+    color: 'green',
+  },
 ] as const;
 
 const EMPTY_FORM = {
@@ -66,8 +82,22 @@ export const useAccounts = () => {
   );
   const showToast = useToast();
 
-  // Current month key (YYYY-MM)
-  const currentMonth = useMemo(() => new Date().toISOString().slice(0, 7), []);
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  const [selectedMonth, setSelectedMonth] = useState(thisMonth);
+  const currentMonth = selectedMonth;
+
+  const prevMonth = useCallback(() => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const d = new Date(y, m - 2, 1);
+    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }, [selectedMonth]);
+
+  const nextMonth = useCallback(() => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const d = new Date(y, m, 1);
+    const next = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    if (next <= thisMonth) setSelectedMonth(next);
+  }, [selectedMonth, thisMonth]);
 
   // ── Cash & Bank balances ───────────────────────────────────
   const {
@@ -84,6 +114,8 @@ export const useAccounts = () => {
     mBankToCash,
     mExpCash,
     mExpBank,
+    mAddToBank,
+    mAddToCash,
     cashOB,
     bankOB,
   } = useMemo(() => {
@@ -113,6 +145,12 @@ export const useAccounts = () => {
     const mExpBank = mTxns
       .filter(t => t.type === 'EXPENSE_BANK')
       .reduce((s, t) => s + t.amount, 0);
+    const mAddToBank = mTxns
+      .filter(t => t.type === 'ADD_TO_BANK')
+      .reduce((s, t) => s + t.amount, 0);
+    const mAddToCash = mTxns
+      .filter(t => t.type === 'ADD_TO_CASH')
+      .reduce((s, t) => s + t.amount, 0);
 
     // Today
     const todayBills = bills.filter(b => b.date === today);
@@ -135,8 +173,8 @@ export const useAccounts = () => {
       .reduce((s, t) => s + t.amount, 0);
 
     return {
-      currentCash: ob.cash + mCashSales + mBankToCash - mCashToBank - mExpCash,
-      currentBank: ob.bank + mUpiSales + mCashToBank - mBankToCash - mExpBank,
+      currentCash: ob.cash + mCashSales + mBankToCash + mAddToCash - mCashToBank - mExpCash,
+      currentBank: ob.bank + mUpiSales + mCashToBank + mAddToBank - mBankToCash - mExpBank,
       todayCash,
       todayUPI,
       todayDeposits,
@@ -148,6 +186,8 @@ export const useAccounts = () => {
       mBankToCash,
       mExpCash,
       mExpBank,
+      mAddToBank,
+      mAddToCash,
       cashOB: ob.cash,
       bankOB: ob.bank,
     };
@@ -186,18 +226,28 @@ export const useAccounts = () => {
       showToast('Enter a valid amount', 'error');
       return;
     }
+    const amt = +txnForm.amount;
+    const def = TXN_TYPES.find(t => t.id === txnForm.type);
+    if (def && def.cashEffect < 0 && currentCash - amt < 0) {
+      showToast(`Insufficient cash. Available: ₹${currentCash.toLocaleString()}`, 'error');
+      return;
+    }
+    if (def && def.bankEffect < 0 && currentBank - amt < 0) {
+      showToast(`Insufficient bank balance. Available: ₹${currentBank.toLocaleString()}`, 'error');
+      return;
+    }
     try {
       const newId = await dbInsertTransaction({
         date: txnForm.date,
         type: txnForm.type,
-        amount: +txnForm.amount,
+        amount: amt,
         note: txnForm.note,
       });
       const t: Transaction = {
         id: newId,
         date: txnForm.date,
         type: txnForm.type,
-        amount: +txnForm.amount,
+        amount: amt,
         note: txnForm.note,
       };
       setTransactions(p => [...p, t]);
@@ -240,12 +290,18 @@ export const useAccounts = () => {
     mBankToCash,
     mExpCash,
     mExpBank,
+    mAddToBank,
+    mAddToCash,
     todayCash,
     todayUPI,
     todayDeposits,
     todayWithdrawals,
     todayExpenses,
     currentMonth,
+    selectedMonth,
+    thisMonth,
+    prevMonth,
+    nextMonth,
     txnHistory,
     TXN_TYPES,
     // transaction modal

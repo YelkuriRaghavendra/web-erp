@@ -1,5 +1,18 @@
 import { Btn, Field, Modal, Row, Badge } from '../../shared/components/ui';
 import { useItems } from './useItems';
+import type { ItemType } from '../../core/types';
+
+// Human-readable labels for itemType values
+const TYPE_LABELS: Record<ItemType, string> = {
+  regular: 'Regular',
+  cylinder: 'Cylinder',
+  linked: 'Linked',
+};
+const TYPE_BADGE_COLOR: Record<ItemType, 'orange' | 'blue' | 'purple'> = {
+  regular: 'orange',
+  cylinder: 'blue',
+  linked: 'purple',
+};
 
 export const ItemMasterPage = () => {
   const {
@@ -8,12 +21,15 @@ export const ItemMasterPage = () => {
     filter,
     setFilter,
     cylItems,
+    linkedItems,
     otherItems,
+    allCylinderItems,
     inventoryValue,
     addModal,
     setAddModal,
     form,
     setField,
+    setItemType,
     addItem,
     editId,
     editPrice,
@@ -33,7 +49,303 @@ export const ItemMasterPage = () => {
     openAdjust,
     saveAdjust,
     closeAdjust,
+    linkEditId,
+    linkEditSourceId,
+    setLinkEditSourceId,
+    openLinkEdit,
+    saveLinkEdit,
+    unlinkItem,
+    closeLinkEdit,
   } = useItems();
+
+  // ── Shared table row renderer ─────────────────────────────
+  const renderTableRow = (item: (typeof otherItems)[0], idx: number, arr: typeof otherItems) => {
+    const qty = stock[item.id]?.qty ?? 0;
+    const val = qty * item.price;
+    const isEditing = editId === item.id;
+    const srcItem =
+      item.itemType === 'linked' && item.stockSourceId
+        ? items.find(i => i.id === item.stockSourceId)
+        : null;
+
+    return (
+      <tr
+        key={item.id}
+        style={{
+          borderBottom: idx < arr.length - 1 ? '1px solid var(--border)' : 'none',
+          opacity: item.active ? 1 : 0.55,
+        }}
+        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg)')}
+        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+      >
+        <td style={{ padding: '14px 18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div>
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: item.active ? 'var(--ink)' : 'var(--ink3)',
+                }}
+              >
+                {item.name}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--ink3)', marginTop: 2 }}>
+                ID #{item.id} · {item.unit}
+                {srcItem && (
+                  <span
+                    style={{
+                      marginLeft: 6,
+                      color: 'var(--purple)',
+                      fontWeight: 700,
+                    }}
+                  >
+                    ← stock from {srcItem.name}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </td>
+        <td style={{ padding: '14px 18px', textAlign: 'right' }}>
+          <Badge
+            label={TYPE_LABELS[item.itemType]}
+            color={TYPE_BADGE_COLOR[item.itemType]}
+          />
+        </td>
+        <td style={{ padding: '14px 18px', textAlign: 'right' }}>
+          {isEditing ? (
+            <div
+              style={{
+                display: 'flex',
+                gap: 5,
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+              }}
+            >
+              <span style={{ fontSize: 13, color: 'var(--ink3)' }}>₹</span>
+              <input
+                type='number'
+                value={editPrice}
+                onChange={e => setEditPrice(e.target.value)}
+                autoFocus
+                style={{
+                  width: 80,
+                  background: 'var(--canvas)',
+                  border: '2px solid var(--accent)',
+                  borderRadius: 7,
+                  padding: '5px 8px',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  fontFamily: "'JetBrains Mono',monospace",
+                  outline: 'none',
+                  textAlign: 'right',
+                  color: 'var(--ink)',
+                }}
+              />
+              <button
+                onClick={() => savePrice()}
+                style={{
+                  padding: '5px 9px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: 'var(--accent)',
+                  color: '#fff',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontFamily: "'Plus Jakarta Sans',sans-serif",
+                }}
+              >
+                ✓
+              </button>
+              <button
+                onClick={cancelEditPrice}
+                style={{
+                  padding: '5px 9px',
+                  borderRadius: 6,
+                  border: '1px solid var(--border2)',
+                  background: 'transparent',
+                  color: 'var(--ink3)',
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  fontFamily: "'Plus Jakarta Sans',sans-serif",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "'JetBrains Mono',monospace",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  color: item.price > 0 ? 'var(--ink)' : 'var(--ink3)',
+                }}
+              >
+                {item.price > 0 ? `₹${item.price.toLocaleString()}` : 'Free'}
+              </span>
+              <button
+                onClick={() => startEditPrice(item.id, item.price)}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: 'var(--accent)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  fontFamily: "'Plus Jakarta Sans',sans-serif",
+                }}
+              >
+                edit
+              </button>
+            </div>
+          )}
+        </td>
+        <td style={{ padding: '14px 18px', textAlign: 'right' }}>
+          {item.itemType === 'linked' ? (
+            <>
+              <span
+                style={{
+                  fontFamily: "'JetBrains Mono',monospace",
+                  fontWeight: 800,
+                  fontSize: 15,
+                  color: (stock[item.stockSourceId!]?.qty ?? 0) > 0 ? 'var(--ink)' : 'var(--red)',
+                }}
+              >
+                {stock[item.stockSourceId!]?.qty ?? 0}
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--ink3)', marginLeft: 4 }}>
+                {srcItem?.unit ?? item.unit}
+              </span>
+            </>
+          ) : (
+            <>
+              <span
+                style={{
+                  fontFamily: "'JetBrains Mono',monospace",
+                  fontWeight: 800,
+                  fontSize: 15,
+                  color: qty > 0 ? 'var(--ink)' : 'var(--red)',
+                }}
+              >
+                {qty}
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--ink3)', marginLeft: 4 }}>
+                {item.unit}
+              </span>
+            </>
+          )}
+        </td>
+        <td style={{ padding: '14px 18px', textAlign: 'right' }}>
+          <span
+            style={{
+              fontFamily: "'JetBrains Mono',monospace",
+              fontWeight: 700,
+              fontSize: 13,
+              color: val > 0 ? 'var(--green)' : 'var(--ink3)',
+            }}
+          >
+            {val > 0 ? `₹${val.toLocaleString()}` : '—'}
+          </span>
+        </td>
+        <td style={{ padding: '14px 18px', textAlign: 'right' }}>
+          <Badge
+            label={item.active ? 'Active' : 'Inactive'}
+            color={item.active ? 'green' : 'gray'}
+          />
+        </td>
+        <td style={{ padding: '14px 18px', textAlign: 'right' }}>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            {item.itemType !== 'linked' && (
+              <button
+                onClick={() => openAdjust(item.id)}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: 7,
+                  border: '1px solid var(--bluebd)',
+                  background: 'var(--bluebg)',
+                  color: 'var(--blue)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontFamily: "'Plus Jakarta Sans',sans-serif",
+                }}
+              >
+                Adjust
+              </button>
+            )}
+            {item.itemType !== 'linked' ? (
+              <button
+                onClick={() => openLinkEdit(item.id)}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: 7,
+                  border: '1px solid var(--purplebd)',
+                  background: 'var(--purplebg)',
+                  color: 'var(--purple)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontFamily: "'Plus Jakarta Sans',sans-serif",
+                }}
+              >
+                Link
+              </button>
+            ) : (
+              <button
+                onClick={() => unlinkItem(item.id)}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: 7,
+                  border: '1px solid var(--amberbd)',
+                  background: 'var(--amberbg)',
+                  color: 'var(--amber)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontFamily: "'Plus Jakarta Sans',sans-serif",
+                }}
+              >
+                Unlink
+              </button>
+            )}
+            <button
+              onClick={() =>
+                item.active ? requestToggle(item.id) : toggleItem(item.id)
+              }
+              style={{
+                padding: '5px 14px',
+                borderRadius: 7,
+                border: `1px solid ${item.active ? 'var(--redbd)' : 'var(--greenbd)'}`,
+                background: item.active ? 'var(--redbg)' : 'var(--greenbg)',
+                color: item.active ? 'var(--red)' : 'var(--green)',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontFamily: "'Plus Jakarta Sans',sans-serif",
+              }}
+            >
+              {item.active ? 'Disable' : 'Enable'}
+            </button>
+          </div>
+        </td>
+      </tr>
+    );
+  };
+
+  // Combine linked + other items into one table
+  const tableItems = [...linkedItems, ...otherItems];
 
   return (
     <div
@@ -67,24 +379,12 @@ export const ItemMasterPage = () => {
       </div>
 
       {/* Summary strip */}
-      <div className="erp-grid-4" style={{ marginBottom: 20 }}>
+      <div className='erp-grid-4' style={{ marginBottom: 20 }}>
         {[
           { l: 'Total Items', v: items.length, c: 'var(--ink)' },
-          {
-            l: 'Active',
-            v: items.filter(i => i.active).length,
-            c: 'var(--green)',
-          },
-          {
-            l: 'Inactive',
-            v: items.filter(i => !i.active).length,
-            c: 'var(--red)',
-          },
-          {
-            l: 'Inventory Value',
-            v: `₹${inventoryValue.toLocaleString()}`,
-            c: 'var(--accent)',
-          },
+          { l: 'Active', v: items.filter(i => i.active).length, c: 'var(--green)' },
+          { l: 'Inactive', v: items.filter(i => !i.active).length, c: 'var(--red)' },
+          { l: 'Inventory Value', v: `₹${inventoryValue.toLocaleString()}`, c: 'var(--accent)' },
         ].map(r => (
           <div
             key={r.l}
@@ -163,7 +463,7 @@ export const ItemMasterPage = () => {
         ))}
       </div>
 
-      {/* Cylinders section */}
+      {/* Cylinders section — card grid */}
       {cylItems.length > 0 && (
         <div style={{ marginBottom: 28 }}>
           <div
@@ -189,7 +489,7 @@ export const ItemMasterPage = () => {
             </span>
             <div style={{ height: 1, flex: 1, background: 'var(--border)' }} />
           </div>
-          <div className="erp-grid-3">
+          <div className='erp-grid-3'>
             {cylItems.map(item => {
               const qty = stock[item.id]?.qty ?? 0;
               const val = qty * item.price;
@@ -216,9 +516,7 @@ export const ItemMasterPage = () => {
                     }}
                   >
                     <div>
-                      <div
-                        style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}
-                      >
+                      <div style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>
                         {item.name}
                       </div>
                       <div
@@ -435,15 +733,15 @@ export const ItemMasterPage = () => {
                   </div>
                   <div style={{ padding: '10px 18px' }}>
                     <button
-                      onClick={() => item.active ? requestToggle(item.id) : toggleItem(item.id)}
+                      onClick={() =>
+                        item.active ? requestToggle(item.id) : toggleItem(item.id)
+                      }
                       style={{
                         width: '100%',
                         padding: '7px',
                         borderRadius: 8,
                         border: `1px solid ${item.active ? 'var(--redbd)' : 'var(--greenbd)'}`,
-                        background: item.active
-                          ? 'var(--redbg)'
-                          : 'var(--greenbg)',
+                        background: item.active ? 'var(--redbg)' : 'var(--greenbg)',
                         color: item.active ? 'var(--red)' : 'var(--green)',
                         fontSize: 12,
                         fontWeight: 700,
@@ -461,8 +759,8 @@ export const ItemMasterPage = () => {
         </div>
       )}
 
-      {/* Other items table */}
-      {otherItems.length > 0 && (
+      {/* All other items table (Linked + Regular together) */}
+      {tableItems.length > 0 && (
         <div>
           <div
             style={{
@@ -483,7 +781,7 @@ export const ItemMasterPage = () => {
                 padding: '0 12px',
               }}
             >
-              📦 Other Items
+              📦 Items
             </span>
             <div style={{ height: 1, flex: 1, background: 'var(--border)' }} />
           </div>
@@ -497,320 +795,83 @@ export const ItemMasterPage = () => {
             }}
           >
             <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table style={{ width: '100%', minWidth: 480, borderCollapse: 'collapse' }}>
-              <thead>
-                <tr
-                  style={{
-                    background: 'var(--bg)',
-                    borderBottom: '1px solid var(--border)',
-                  }}
-                >
-                  {['Item', 'Price', 'Stock', 'Value', 'Status', ''].map(
-                    (h, i) => (
-                      <th
-                        key={`${h}-${i}`}
-                        style={{
-                          padding: '10px 18px',
-                          fontSize: 10.5,
-                          fontWeight: 800,
-                          color: 'var(--ink3)',
-                          textTransform: 'uppercase',
-                          letterSpacing: '.07em',
-                          textAlign:
-                            i > 0 && i < 5
-                              ? 'right'
-                              : i === 5
-                                ? 'right'
-                                : 'left',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {h}
-                      </th>
-                    )
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {otherItems.map((item, idx) => {
-                  const qty = stock[item.id]?.qty ?? 0;
-                  const val = qty * item.price;
-                  const isEditing = editId === item.id;
-                  return (
-                    <tr
-                      key={item.id}
-                      style={{
-                        borderBottom:
-                          idx < otherItems.length - 1
-                            ? '1px solid var(--border)'
-                            : 'none',
-                        opacity: item.active ? 1 : 0.55,
-                      }}
-                      onMouseEnter={e =>
-                        (e.currentTarget.style.background = 'var(--bg)')
-                      }
-                      onMouseLeave={e =>
-                        (e.currentTarget.style.background = 'transparent')
-                      }
-                    >
-                      <td style={{ padding: '14px 18px' }}>
-                        <div
+              <table
+                style={{ width: '100%', minWidth: 560, borderCollapse: 'collapse' }}
+              >
+                <thead>
+                  <tr
+                    style={{
+                      background: 'var(--bg)',
+                      borderBottom: '1px solid var(--border)',
+                    }}
+                  >
+                    {['Item', 'Type', 'Price', 'Stock', 'Value', 'Status', ''].map(
+                      (h, i) => (
+                        <th
+                          key={`${h}-${i}`}
                           style={{
-                            fontSize: 14,
-                            fontWeight: 700,
-                            color: item.active ? 'var(--ink)' : 'var(--ink3)',
-                          }}
-                        >
-                          {item.name}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: 'var(--ink3)',
-                            marginTop: 2,
-                          }}
-                        >
-                          ID #{item.id} · {item.unit}
-                        </div>
-                      </td>
-                      <td style={{ padding: '14px 18px', textAlign: 'right' }}>
-                        {isEditing ? (
-                          <div
-                            style={{
-                              display: 'flex',
-                              gap: 5,
-                              justifyContent: 'flex-end',
-                              alignItems: 'center',
-                            }}
-                          >
-                            <span
-                              style={{ fontSize: 13, color: 'var(--ink3)' }}
-                            >
-                              ₹
-                            </span>
-                            <input
-                              type='number'
-                              value={editPrice}
-                              onChange={e => setEditPrice(e.target.value)}
-                              autoFocus
-                              style={{
-                                width: 80,
-                                background: 'var(--canvas)',
-                                border: '2px solid var(--accent)',
-                                borderRadius: 7,
-                                padding: '5px 8px',
-                                fontSize: 14,
-                                fontWeight: 700,
-                                fontFamily: "'JetBrains Mono',monospace",
-                                outline: 'none',
-                                textAlign: 'right',
-                                color: 'var(--ink)',
-                              }}
-                            />
-                            <button
-                              onClick={() => savePrice()}
-                              style={{
-                                padding: '5px 9px',
-                                borderRadius: 6,
-                                border: 'none',
-                                background: 'var(--accent)',
-                                color: '#fff',
-                                fontSize: 12,
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                fontFamily: "'Plus Jakarta Sans',sans-serif",
-                              }}
-                            >
-                              ✓
-                            </button>
-                            <button
-                              onClick={cancelEditPrice}
-                              style={{
-                                padding: '5px 9px',
-                                borderRadius: 6,
-                                border: '1px solid var(--border2)',
-                                background: 'transparent',
-                                color: 'var(--ink3)',
-                                fontSize: 11,
-                                cursor: 'pointer',
-                                fontFamily: "'Plus Jakarta Sans',sans-serif",
-                              }}
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ) : (
-                          <div
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'flex-end',
-                              alignItems: 'center',
-                              gap: 8,
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontFamily: "'JetBrains Mono',monospace",
-                                fontWeight: 700,
-                                fontSize: 14,
-                                color:
-                                  item.price > 0 ? 'var(--ink)' : 'var(--ink3)',
-                              }}
-                            >
-                              {item.price > 0
-                                ? `₹${item.price.toLocaleString()}`
-                                : 'Free'}
-                            </span>
-                            <button
-                              onClick={() =>
-                                startEditPrice(item.id, item.price)
-                              }
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 700,
-                                color: 'var(--accent)',
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                textDecoration: 'underline',
-                                fontFamily: "'Plus Jakarta Sans',sans-serif",
-                              }}
-                            >
-                              edit
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ padding: '14px 18px', textAlign: 'right' }}>
-                        <span
-                          style={{
-                            fontFamily: "'JetBrains Mono',monospace",
+                            padding: '10px 18px',
+                            fontSize: 10.5,
                             fontWeight: 800,
-                            fontSize: 15,
-                            color: qty > 0 ? 'var(--ink)' : 'var(--red)',
-                          }}
-                        >
-                          {qty}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: 11,
                             color: 'var(--ink3)',
-                            marginLeft: 4,
+                            textTransform: 'uppercase',
+                            letterSpacing: '.07em',
+                            textAlign: i === 0 ? 'left' : i < 6 ? 'right' : 'right',
+                            whiteSpace: 'nowrap',
                           }}
                         >
-                          {item.unit}
-                        </span>
-                      </td>
-                      <td style={{ padding: '14px 18px', textAlign: 'right' }}>
-                        <span
-                          style={{
-                            fontFamily: "'JetBrains Mono',monospace",
-                            fontWeight: 700,
-                            fontSize: 13,
-                            color: val > 0 ? 'var(--green)' : 'var(--ink3)',
-                          }}
-                        >
-                          {val > 0 ? `₹${val.toLocaleString()}` : '—'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '14px 18px', textAlign: 'right' }}>
-                        <Badge
-                          label={item.active ? 'Active' : 'Inactive'}
-                          color={item.active ? 'green' : 'gray'}
-                        />
-                      </td>
-                      <td style={{ padding: '14px 18px', textAlign: 'right' }}>
-                        <div
-                          style={{
-                            display: 'flex',
-                            gap: 8,
-                            justifyContent: 'flex-end',
-                          }}
-                        >
-                          <button
-                            onClick={() => openAdjust(item.id)}
-                            style={{
-                              padding: '5px 12px',
-                              borderRadius: 7,
-                              border: '1px solid var(--bluebd)',
-                              background: 'var(--bluebg)',
-                              color: 'var(--blue)',
-                              fontSize: 12,
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              fontFamily: "'Plus Jakarta Sans',sans-serif",
-                            }}
-                          >
-                            Adjust
-                          </button>
-                          <button
-                            onClick={() => item.active ? requestToggle(item.id) : toggleItem(item.id)}
-                            style={{
-                              padding: '5px 14px',
-                              borderRadius: 7,
-                              border: `1px solid ${item.active ? 'var(--redbd)' : 'var(--greenbd)'}`,
-                              background: item.active
-                                ? 'var(--redbg)'
-                                : 'var(--greenbg)',
-                              color: item.active
-                                ? 'var(--red)'
-                                : 'var(--green)',
-                              fontSize: 12,
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              fontFamily: "'Plus Jakarta Sans',sans-serif",
-                            }}
-                          >
-                            {item.active ? 'Disable' : 'Enable'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr
-                  style={{
-                    background: 'var(--accentbg)',
-                    borderTop: '2px solid var(--accentbd)',
-                  }}
-                >
-                  <td
-                    colSpan={3}
-                    style={{
-                      padding: '12px 18px',
-                      fontWeight: 800,
-                      color: 'var(--accent)',
-                      fontSize: 13,
-                    }}
-                  >
-                    Total Inventory Value (non-cylinder)
-                  </td>
-                  <td
-                    style={{
-                      padding: '12px 18px',
-                      textAlign: 'right',
-                      fontFamily: "'JetBrains Mono',monospace",
-                      fontWeight: 900,
-                      fontSize: 15,
-                      color: 'var(--accent)',
-                    }}
-                    colSpan={3}
-                  >
-                    ₹
-                    {otherItems
-                      .filter(i => i.active)
-                      .reduce(
-                        (s, it) => s + (stock[it.id]?.qty ?? 0) * it.price,
-                        0
+                          {h}
+                        </th>
                       )
-                      .toLocaleString()}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {tableItems.map((item, idx) =>
+                    renderTableRow(item, idx, tableItems)
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr
+                    style={{
+                      background: 'var(--accentbg)',
+                      borderTop: '2px solid var(--accentbd)',
+                    }}
+                  >
+                    <td
+                      colSpan={4}
+                      style={{
+                        padding: '12px 18px',
+                        fontWeight: 800,
+                        color: 'var(--accent)',
+                        fontSize: 13,
+                      }}
+                    >
+                      Total Inventory Value (non-cylinder)
+                    </td>
+                    <td
+                      style={{
+                        padding: '12px 18px',
+                        textAlign: 'right',
+                        fontFamily: "'JetBrains Mono',monospace",
+                        fontWeight: 900,
+                        fontSize: 15,
+                        color: 'var(--accent)',
+                      }}
+                      colSpan={3}
+                    >
+                      ₹
+                      {tableItems
+                        .filter(i => i.active && i.itemType !== 'linked')
+                        .reduce(
+                          (s, it) => s + (stock[it.id]?.qty ?? 0) * it.price,
+                          0
+                        )
+                        .toLocaleString()}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
         </div>
@@ -818,11 +879,7 @@ export const ItemMasterPage = () => {
 
       {/* Add item modal */}
       {addModal && (
-        <Modal
-          title='Add New Item'
-          onClose={() => setAddModal(false)}
-          width={440}
-        >
+        <Modal title='Add New Item' onClose={() => setAddModal(false)} width={460}>
           <Field
             label='Item Name'
             value={form.name}
@@ -845,6 +902,68 @@ export const ItemMasterPage = () => {
               placeholder='0'
             />
           </Row>
+
+          {/* Item Type selector */}
+          <Field
+            label='Item Type'
+            value={form.itemType}
+            onChange={v => setItemType(v as ItemType)}
+            opts={[
+              { v: 'regular', l: 'Regular — own stock, appears in purchase & billing' },
+              { v: 'cylinder', l: 'Cylinder — gas cylinder, shown in Cylinders section' },
+              { v: 'linked', l: 'Linked — draws stock from another item when billed' },
+            ]}
+          />
+
+          {/* Stock Source — only shown for linked items */}
+          {form.itemType === 'linked' && (
+            <div>
+              {allCylinderItems.length > 0 ? (
+                <Field
+                  label='Stock Source (which item loses stock when billed)'
+                  value={form.stockSourceId}
+                  onChange={v => setField('stockSourceId', v)}
+                  required
+                  opts={[
+                    { v: '', l: '— select a source —' },
+                    ...allCylinderItems.map(c => ({ v: c.id, l: c.name })),
+                  ]}
+                />
+              ) : (
+                <div
+                  style={{
+                    background: 'var(--redbg)',
+                    border: '1px solid var(--redbd)',
+                    borderRadius: 8,
+                    padding: '10px 14px',
+                    fontSize: 13,
+                    color: 'var(--red)',
+                    fontWeight: 600,
+                  }}
+                >
+                  ⚠️ No cylinder items exist yet. Add a Cylinder item first, then
+                  create linked items that draw from it.
+                </div>
+              )}
+              <div
+                style={{
+                  background: 'var(--purplebg, #f5f0ff)',
+                  border: '1px solid var(--purplebd, #c4b5fd)',
+                  borderRadius: 8,
+                  padding: '10px 14px',
+                  fontSize: 12,
+                  color: 'var(--purple)',
+                  fontWeight: 600,
+                  marginTop: 8,
+                }}
+              >
+                💡 When this item is billed, stock is deducted from the selected
+                source item — not from this item's own stock. This item will only
+                appear in billing when the source item has stock.
+              </div>
+            </div>
+          )}
+
           <div
             style={{
               background: 'var(--amberbg)',
@@ -856,7 +975,7 @@ export const ItemMasterPage = () => {
               fontWeight: 600,
             }}
           >
-            ⚠️ Enter 0 for free/scheme items. Price can be edited later.
+            ⚠️ Enter 0 for free / scheme items. Price can be edited later.
           </div>
           <div
             style={{
@@ -878,11 +997,7 @@ export const ItemMasterPage = () => {
 
       {/* Disable item confirmation modal */}
       {pendingToggleItem && (
-        <Modal
-          title='Disable Item?'
-          onClose={cancelToggle}
-          width={400}
-        >
+        <Modal title='Disable Item?' onClose={cancelToggle} width={400}>
           <div
             style={{
               background: 'var(--redbg)',
@@ -895,8 +1010,8 @@ export const ItemMasterPage = () => {
               marginBottom: 4,
             }}
           >
-            ⚠️ Disabling <strong>{pendingToggleItem.name}</strong> will hide it from billing.
-            Any existing bills are not affected.
+            ⚠️ Disabling <strong>{pendingToggleItem.name}</strong> will hide it
+            from billing. Any existing bills are not affected.
           </div>
           <div
             style={{
@@ -908,13 +1023,59 @@ export const ItemMasterPage = () => {
               marginTop: 4,
             }}
           >
-            <Btn variant='ghost' onClick={cancelToggle}>Cancel</Btn>
-            <Btn onClick={confirmToggle} style={{ background: 'var(--red)', border: 'none' }}>
+            <Btn variant='ghost' onClick={cancelToggle}>
+              Cancel
+            </Btn>
+            <Btn
+              onClick={confirmToggle}
+              style={{ background: 'var(--red)', border: 'none' }}
+            >
               Yes, Disable
             </Btn>
           </div>
         </Modal>
       )}
+
+      {/* Link-to-source modal */}
+      {linkEditId !== null && (() => {
+        const linkItem = items.find(i => i.id === linkEditId);
+        if (!linkItem) return null;
+        return (
+          <Modal
+            title={`Link "${linkItem.name}" to Stock Source`}
+            onClose={closeLinkEdit}
+            width={400}
+          >
+            <p style={{ fontSize: 13, color: 'var(--ink2)', marginBottom: 16, lineHeight: 1.5 }}>
+              When billed, this item will draw stock from the selected source instead of its own stock.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+              <label style={{ fontSize: 11, fontWeight: 800, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.07em' }}>
+                Stock Source (Cylinder) <span style={{ color: 'var(--red)' }}>*</span>
+              </label>
+              <select
+                value={linkEditSourceId}
+                onChange={e => setLinkEditSourceId(e.target.value)}
+                style={{
+                  width: '100%', padding: '8px 12px', borderRadius: 8,
+                  border: '1.5px solid var(--border2)', background: 'var(--canvas)',
+                  fontSize: 13, color: 'var(--ink)', outline: 'none',
+                  fontFamily: "'Plus Jakarta Sans',sans-serif",
+                }}
+              >
+                <option value=''>— Select cylinder —</option>
+                {allCylinderItems.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <Btn variant='ghost' onClick={closeLinkEdit}>Cancel</Btn>
+              <Btn onClick={() => saveLinkEdit(linkEditSourceId)}>Save Link</Btn>
+            </div>
+          </Modal>
+        );
+      })()}
 
       {/* Stock adjust modal */}
       {adjustItem !== null && adjustItemData && (
@@ -934,16 +1095,11 @@ export const ItemMasterPage = () => {
               marginBottom: 4,
             }}
           >
-            <span
-              style={{ fontSize: 13, color: 'var(--ink3)', fontWeight: 600 }}
-            >
+            <span style={{ fontSize: 13, color: 'var(--ink3)', fontWeight: 600 }}>
               Current Stock
             </span>
             <span
-              style={{
-                fontWeight: 800,
-                fontFamily: "'JetBrains Mono',monospace",
-              }}
+              style={{ fontWeight: 800, fontFamily: "'JetBrains Mono',monospace" }}
             >
               {stock[adjustItem]?.qty ?? 0} {adjustItemData.unit}
             </span>

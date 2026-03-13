@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { Field, Btn } from '../../shared/components/ui';
-import { useERPStore } from '../../core/store';
 import { hashPassword } from '../../core/crypto';
-import { fetchAllStaff } from '../../core/supabase';
+import { checkStaffLogin } from '../../core/supabase';
 import type { ERPUser } from '../../core/types';
 
 // ── Per-username failed-attempt tracker (in-memory, clears on reload) ──
@@ -11,37 +10,13 @@ const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 30_000; // 30 seconds
 
 export const LoginPage = ({ onLogin }: { onLogin: (u: ERPUser) => void }) => {
-  const staff = useERPStore(s => s.staff);
-  const setStaff = useERPStore(s => s.setStaff);
-
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
   const [lockSecs, setLockSecs] = useState(0);
-  const [retrying, setRetrying] = useState(false);
-  const [initialFetchDone, setInitialFetchDone] = useState(false);
+  const [signing, setSigning] = useState(false); // loading state during DB query
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Manual retry — re-fetch staff from Supabase without full page reload
-  const retryFetch = async () => {
-    setRetrying(true);
-    const result = await fetchAllStaff();
-    console.log('[LoginPage] retry result:', result);
-    if (result.length) setStaff(result);
-    setRetrying(false);
-    setInitialFetchDone(true);
-  };
-
-  // Auto-fetch staff on mount if store is empty (first load / no session)
-  useEffect(() => {
-    if (staff.length === 0) {
-      void retryFetch();
-    } else {
-      setInitialFetchDone(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const startLockCountdown = (remaining: number) => {
     setLockSecs(Math.ceil(remaining / 1000));
@@ -59,7 +34,12 @@ export const LoginPage = ({ onLogin }: { onLogin: (u: ERPUser) => void }) => {
   };
 
   const go = async () => {
+    if (signing) return;
     const key = username.trim().toLowerCase();
+    if (!key || !password) {
+      setErr('Enter username and password');
+      return;
+    }
 
     // Check lockout
     const lock = failMap.get(key);
@@ -71,23 +51,21 @@ export const LoginPage = ({ onLogin }: { onLogin: (u: ERPUser) => void }) => {
       return;
     }
 
-    // Hash the entered password before comparing with stored hash
-    const hashedInput = await hashPassword(password);
-    const match = staff.find(
-      s => s.u === key && s.p === hashedInput && s.active
-    );
+    setSigning(true);
+    setErr('');
+    try {
+      // Hash client-side first, then send hash to RPC for server-side comparison.
+      // The stored password hash is NEVER returned to the browser.
+      const hashedInput = await hashPassword(password);
+      const result = await checkStaffLogin(key, hashedInput);
 
-    if (match) {
-      failMap.delete(key);
-      onLogin({
-        u: match.u,
-        role: match.role,
-        name: match.name,
-        createdAt: Date.now(),
-      });
-    } else {
-      const exists = staff.find(s => s.u === key);
+      if (result.ok) {
+        failMap.delete(key);
+        onLogin({ u: result.user.u, role: result.user.role, name: result.user.name, createdAt: Date.now() });
+        return;
+      }
 
+      // Failed — track attempts
       const prev = failMap.get(key) ?? { count: 0, until: 0 };
       const count = prev.count + 1;
       const until = count >= MAX_ATTEMPTS ? Date.now() + LOCKOUT_MS : 0;
@@ -96,7 +74,7 @@ export const LoginPage = ({ onLogin }: { onLogin: (u: ERPUser) => void }) => {
       if (until > 0) {
         startLockCountdown(LOCKOUT_MS);
         setErr('Too many failed attempts. Account locked for 30 seconds.');
-      } else if (exists && !exists.active) {
+      } else if (result.reason === 'inactive') {
         setErr('Account is inactive. Contact admin.');
       } else {
         const left = MAX_ATTEMPTS - count;
@@ -104,16 +82,16 @@ export const LoginPage = ({ onLogin }: { onLogin: (u: ERPUser) => void }) => {
           `Invalid credentials${left <= 2 ? ` — ${left} attempt${left !== 1 ? 's' : ''} left` : ''}`
         );
       }
+    } catch {
+      setErr('Connection error — check internet and try again.');
+    } finally {
+      setSigning(false);
     }
   };
 
   const handleKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') void go();
   };
-
-  // noAccounts: only show the error block if we've finished the auto-fetch and still have nothing
-  const isLoading = !initialFetchDone && staff.length === 0;
-  const noAccounts = initialFetchDone && staff.length === 0;
 
   return (
     <div
@@ -187,168 +165,66 @@ export const LoginPage = ({ onLogin }: { onLogin: (u: ERPUser) => void }) => {
             </p>
           </div>
 
-          {isLoading ? (
-            /* ── Auto-fetching staff — show spinner ── */
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 16,
-                padding: '32px 0',
-              }}
-            >
+          {/* ── Login fields ── */}
+          <div
+            style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+            onKeyDown={handleKey}
+          >
+            <Field
+              label='Username'
+              value={username}
+              onChange={setUsername}
+              placeholder='Enter username'
+            />
+            <Field
+              label='Password'
+              type='password'
+              value={password}
+              onChange={setPassword}
+              placeholder='Enter password'
+            />
+
+            {err && (
               <div
                 style={{
-                  width: 36,
-                  height: 36,
-                  border: '3px solid var(--border)',
-                  borderTopColor: 'var(--accent)',
-                  borderRadius: '50%',
-                  animation: 'spin 0.7s linear infinite',
+                  background: 'var(--redbg)',
+                  border: '1px solid var(--redbd)',
+                  borderRadius: 8,
+                  padding: '10px 14px',
+                  fontSize: 13,
+                  color: 'var(--red)',
+                  fontWeight: 600,
                 }}
-              />
-              <div style={{ fontSize: 13, color: 'var(--ink3)', fontWeight: 600 }}>
-                Connecting to database…
-              </div>
-            </div>
-          ) : noAccounts ? (
-            /* ── No staff in DB or RLS blocking — show retry + instructions ── */
-            <div
-              style={{
-                background: 'var(--amberbg)',
-                border: '1px solid var(--amberbd)',
-                borderRadius: 10,
-                padding: '18px 20px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 12,
-              }}
-            >
-              <div
-                style={{ fontSize: 14, fontWeight: 800, color: 'var(--amber)' }}
               >
-                ⚠ No accounts found
+                ⚠ {err}
               </div>
+            )}
+
+            {lockSecs > 0 && (
               <div
                 style={{
-                  fontSize: 12.5,
-                  color: 'var(--ink2)',
-                  lineHeight: 1.6,
+                  background: 'var(--amberbg)',
+                  border: '1px solid var(--amberbd)',
+                  borderRadius: 8,
+                  padding: '10px 14px',
+                  fontSize: 13,
+                  color: 'var(--amber)',
+                  fontWeight: 600,
                 }}
               >
-                Either the database is empty or access is blocked (RLS).
-                <br />
-                Check the <strong>browser Console</strong> (F12) for the{' '}
-                <code
-                  style={{
-                    background: 'var(--canvas)',
-                    padding: '1px 4px',
-                    borderRadius: 3,
-                  }}
-                >
-                  [fetchAllStaff]
-                </code>{' '}
-                log line — it shows exactly what Supabase returned.
+                🔒 Try again in {lockSecs}s
               </div>
-              <div
-                style={{ fontSize: 12, color: 'var(--ink3)', lineHeight: 1.8 }}
-              >
-                If it shows{' '}
-                <code
-                  style={{
-                    background: 'var(--canvas)',
-                    padding: '1px 4px',
-                    borderRadius: 3,
-                  }}
-                >
-                  data: []
-                </code>
-                , run this SQL in Supabase:
-              </div>
-              <pre
-                style={{
-                  margin: 0,
-                  fontSize: 11,
-                  background: 'var(--canvas)',
-                  borderRadius: 6,
-                  padding: '10px 12px',
-                  color: 'var(--ink2)',
-                  overflowX: 'auto',
-                  border: '1px solid var(--border)',
-                }}
-              >{`drop policy if exists "anon_all" on staff;\ncreate policy "anon_all" on staff\n  for all to anon\n  using (true) with check (true);`}</pre>
-              <Btn
-                onClick={() => void retryFetch()}
-                disabled={retrying}
-                full
-                style={{ marginTop: 4, fontSize: 13 }}
-              >
-                {retrying ? 'Retrying…' : '↺ Retry — fetch accounts again'}
-              </Btn>
-            </div>
-          ) : (
-            /* ── Login fields ── */
-            <div
-              style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
-              onKeyDown={handleKey}
+            )}
+
+            <Btn
+              onClick={() => void go()}
+              disabled={lockSecs > 0 || signing}
+              full
+              style={{ padding: '11px', fontSize: 14, marginTop: 4 }}
             >
-              <Field
-                label='Username'
-                value={username}
-                onChange={setUsername}
-                placeholder='Enter username'
-              />
-              <Field
-                label='Password'
-                type='password'
-                value={password}
-                onChange={setPassword}
-                placeholder='Enter password'
-              />
-
-              {err && (
-                <div
-                  style={{
-                    background: 'var(--redbg)',
-                    border: '1px solid var(--redbd)',
-                    borderRadius: 8,
-                    padding: '10px 14px',
-                    fontSize: 13,
-                    color: 'var(--red)',
-                    fontWeight: 600,
-                  }}
-                >
-                  ⚠ {err}
-                </div>
-              )}
-
-              {lockSecs > 0 && (
-                <div
-                  style={{
-                    background: 'var(--amberbg)',
-                    border: '1px solid var(--amberbd)',
-                    borderRadius: 8,
-                    padding: '10px 14px',
-                    fontSize: 13,
-                    color: 'var(--amber)',
-                    fontWeight: 600,
-                  }}
-                >
-                  🔒 Try again in {lockSecs}s
-                </div>
-              )}
-
-              <Btn
-                onClick={() => void go()}
-                disabled={lockSecs > 0}
-                full
-                style={{ padding: '11px', fontSize: 14, marginTop: 4 }}
-              >
-                Sign In →
-              </Btn>
-            </div>
-          )}
+              {signing ? 'Signing in…' : 'Sign In →'}
+            </Btn>
+          </div>
         </div>
       </div>
 
