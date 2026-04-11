@@ -419,6 +419,7 @@ const BillEditModal = ({
       itemName: l.itemName,
       qty: parseFloat(l.qtyStr) || 0,
       price: parseFloat(l.priceStr) || 0,
+      deposit: l.deposit ?? 0,
       amount: (parseFloat(l.qtyStr) || 0) * (parseFloat(l.priceStr) || 0),
     }))
     .filter(l => l.qty > 0);
@@ -556,6 +557,8 @@ type MonthSummary = {
   cash: number;
   upi: number;
   credit: number;
+  totalDeposits: number;
+  netRevenue: number;
 };
 type SortCol = 'id' | 'date' | 'lines' | 'total' | 'payment';
 type SortDir = 'asc' | 'desc';
@@ -676,6 +679,8 @@ const BillsTable = ({
             { label: 'Cash Collected', value: `₹${monthSummary.cash.toLocaleString()}`, sub: 'received in cash', color: 'var(--green)' },
             { label: 'UPI Received', value: `₹${monthSummary.upi.toLocaleString()}`, sub: 'to bank account', color: 'var(--blue)' },
             { label: 'On Credit', value: `₹${monthSummary.credit.toLocaleString()}`, sub: 'pending payment', color: 'var(--red)' },
+            { label: 'Total Deposits', value: `₹${monthSummary.totalDeposits.toLocaleString()}`, sub: 'to company', color: 'var(--amber)' },
+            { label: 'Net Revenue', value: `₹${monthSummary.netRevenue.toLocaleString()}`, sub: 'agency revenue', color: 'var(--green)' },
           ].map(s => (
             <div
               key={s.label}
@@ -1280,119 +1285,145 @@ export const BillingPage = () => {
               </div>
             )}
 
-            {/* Item rows */}
-            {activeItems.map((item, idx) => {
-              const stockKey = item.itemType === 'linked' && item.stockSourceId ? item.stockSourceId : item.id;
-              const avail = stock[stockKey]?.qty ?? 0;
-              const qty = +(qtys[item.id]?.qty || 0);
-              const rate = +(qtys[item.id]?.rate ?? item.price);
-              const amt = qty * rate;
-              const has = qty > 0;
-              const overQty = qty > avail;
-              return (
-                <div
-                  key={item.id}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 90px 110px 100px',
-                    alignItems: 'center',
-                    borderBottom:
-                      idx < activeItems.length - 1
-                        ? '1px solid var(--border)'
-                        : 'none',
-                    background: overQty ? 'var(--redbg)' : has ? '#fffbf7' : 'var(--canvas)',
-                    transition: 'background .2s',
-                  }}
-                >
+            {/* Item rows — one row per price */}
+            {activeItems.flatMap((item) => {
+              const avail = item.itemType === 'linked'
+                ? Math.min(...item.bundleComponents.map(c =>
+                    Math.floor((stock[c.componentItemId]?.qty ?? 0) / c.qty)
+                  ))
+                : (stock[item.id]?.qty ?? 0);
+
+              return item.prices.map((priceEntry, priceIdx) => {
+                const rowKey = `${item.id}-${priceEntry.id}`;
+                const qty = +(qtys[rowKey]?.qty || 0);
+                const tot = qty * priceEntry.price;
+                const has = qty > 0;
+                const isFirstPrice = priceIdx === 0;
+
+                return (
                   <div
+                    key={rowKey}
                     style={{
-                      padding: '12px 16px',
-                      display: 'flex',
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 90px 110px 100px',
                       alignItems: 'center',
-                      gap: 10,
+                      borderBottom: '1px solid var(--border)',
+                      background: has ? '#fffbf7' : 'var(--canvas)',
+                      transition: 'background .2s',
                     }}
                   >
                     <div
                       style={{
-                        width: 3,
-                        height: 32,
-                        borderRadius: 99,
-                        background: has ? 'var(--accent)' : 'var(--border)',
-                        flexShrink: 0,
+                        padding: '12px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
                       }}
-                    />
-                    <div>
+                    >
                       <div
                         style={{
-                          fontSize: 13.5,
-                          fontWeight: has ? 700 : 500,
-                          color: has ? 'var(--ink)' : 'var(--ink2)',
+                          width: 3,
+                          height: 32,
+                          borderRadius: 99,
+                          background: has ? 'var(--accent)' : 'var(--border)',
+                          flexShrink: 0,
                         }}
-                      >
-                        {item.name}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          marginTop: 3,
-                          fontWeight: 600,
-                          color: overQty ? 'var(--red)' : 'var(--green)',
-                        }}
-                      >
-                        {overQty ? `⚠ Only ${avail} available` : `${avail} in stock`}
+                      />
+                      <div>
+                        <div
+                          style={{
+                            fontSize: 13.5,
+                            fontWeight: has ? 700 : 500,
+                            color: has ? 'var(--ink)' : 'var(--ink2)',
+                          }}
+                        >
+                          {item.name}
+                        </div>
+                        {isFirstPrice && (
+                          <div
+                            style={{
+                              fontSize: 11,
+                              marginTop: 3,
+                              fontWeight: 600,
+                              color: 'var(--green)',
+                            }}
+                          >
+                            {avail} {item.itemType === 'linked' ? 'available' : 'in stock'}
+                            {priceEntry.deposit > 0 && (
+                              <span style={{ color: 'var(--amber)', marginLeft: 6 }}>
+                                · Deposit: ₹{priceEntry.deposit.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {!isFirstPrice && (
+                          <div
+                            style={{
+                              fontSize: 11,
+                              marginTop: 3,
+                              color: 'var(--ink3)',
+                              fontStyle: 'italic',
+                            }}
+                          >
+                            alt price
+                            {priceEntry.deposit > 0 && (
+                              <span style={{ color: 'var(--amber)', marginLeft: 6 }}>
+                                · Deposit: ₹{priceEntry.deposit.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
+                    <div style={{ padding: '8px 10px' }}>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="—"
+                        value={qtys[rowKey]?.qty || ''}
+                        onChange={e => setQtyField(rowKey, e.target.value)}
+                        style={{
+                          width: '100%',
+                          textAlign: 'center',
+                          background: 'var(--canvas)',
+                          border: `2px solid ${has ? 'var(--accent)' : 'var(--border)'}`,
+                          borderRadius: 8,
+                          padding: '8px 6px',
+                          fontSize: 15,
+                          fontWeight: 800,
+                          color: has ? 'var(--accent)' : 'var(--ink3)',
+                          outline: 'none',
+                          fontFamily: "'JetBrains Mono',monospace",
+                        }}
+                      />
+                    </div>
+                    <div style={{ padding: '12px 16px', textAlign: 'right' }}>
+                      <span
+                        style={{
+                          fontFamily: "'JetBrains Mono',monospace",
+                          fontSize: 13,
+                          fontWeight: 700,
+                          color: 'var(--ink2)',
+                        }}
+                      >
+                        ₹{priceEntry.price.toLocaleString()}
+                      </span>
+                    </div>
+                    <div style={{ padding: '12px 16px', textAlign: 'right' }}>
+                      <span
+                        style={{
+                          fontFamily: "'JetBrains Mono',monospace",
+                          fontWeight: 800,
+                          fontSize: 14,
+                          color: has ? 'var(--ink)' : 'var(--ink3)',
+                        }}
+                      >
+                        {has ? `₹${tot.toLocaleString()}` : '—'}
+                      </span>
+                    </div>
                   </div>
-                  <div style={{ padding: '8px 10px' }}>
-                    <input
-                      type='number'
-                      min='0'
-                      placeholder='—'
-                      value={qtys[item.id]?.qty || ''}
-                      onChange={e =>
-                        setQtyField(item.id, 'qty', e.target.value)
-                      }
-                      style={{
-                        width: '100%',
-                        textAlign: 'center',
-                        background: 'var(--canvas)',
-                        border: `2px solid ${overQty ? 'var(--red)' : has ? 'var(--accent)' : 'var(--border)'}`,
-                        borderRadius: 8,
-                        padding: '8px 6px',
-                        fontSize: 15,
-                        fontWeight: 800,
-                        color: overQty ? 'var(--red)' : has ? 'var(--accent)' : 'var(--ink3)',
-                        outline: 'none',
-                        fontFamily: "'JetBrains Mono',monospace",
-                      }}
-                    />
-                  </div>
-                  <div style={{ padding: '12px 16px', textAlign: 'right' }}>
-                    <span
-                      style={{
-                        fontFamily: "'JetBrains Mono',monospace",
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color: 'var(--ink2)',
-                      }}
-                    >
-                      ₹{rate.toLocaleString()}
-                    </span>
-                  </div>
-                  <div style={{ padding: '12px 16px', textAlign: 'right' }}>
-                    <span
-                      style={{
-                        fontFamily: "'JetBrains Mono',monospace",
-                        fontWeight: 800,
-                        fontSize: 14,
-                        color: has ? 'var(--ink)' : 'var(--ink3)',
-                      }}
-                    >
-                      {has ? `₹${amt.toLocaleString()}` : '—'}
-                    </span>
-                  </div>
-                </div>
-              );
+                );
+              });
             })}
           </div>
 

@@ -8,6 +8,7 @@ import type {
   Transaction,
   OpeningBalances,
   StaffUser,
+  DepositSettlement,
 } from './types';
 
 // ── Generic functional-updater helper ────────────────────────
@@ -24,6 +25,7 @@ interface ERPStore {
   purchases: Purchase[];
   openingBalances: OpeningBalances;
   transactions: Transaction[];
+  depositSettlements: DepositSettlement[];
   staff: StaffUser[];
 
   setItems: (v: Setter<Item[]>) => void;
@@ -33,6 +35,7 @@ interface ERPStore {
   setPurchases: (v: Setter<Purchase[]>) => void;
   setOpeningBalances: (v: Setter<OpeningBalances>) => void;
   setTransactions: (v: Setter<Transaction[]>) => void;
+  setDepositSettlements: (v: Setter<DepositSettlement[]>) => void;
   setStaff: (v: Setter<StaffUser[]>) => void;
 }
 
@@ -46,6 +49,7 @@ export const useERPStore = create<ERPStore>()(set => ({
   purchases: [],
   openingBalances: {},
   transactions: [],
+  depositSettlements: [],
   staff: [],
 
   setItems: v => set(s => ({ items: apply(s.items, v) })),
@@ -56,5 +60,6 @@ export const useERPStore = create<ERPStore>()(set => ({
   setOpeningBalances: v =>
     set(s => ({ openingBalances: apply(s.openingBalances, v) })),
   setTransactions: v => set(s => ({ transactions: apply(s.transactions, v) })),
+  setDepositSettlements: v => set(s => ({ depositSettlements: apply(s.depositSettlements, v) })),
   setStaff: v => set(s => ({ staff: apply(s.staff, v) })),
 }));

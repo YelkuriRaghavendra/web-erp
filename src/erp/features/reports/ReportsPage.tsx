@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Page,
   Btn,
@@ -8,6 +9,7 @@ import {
 } from '../../shared/components/ui';
 import { monthLabel } from '../../core/constants';
 import { useReports, TABS } from './useReports';
+import type { ERPUser } from '../../core/types';
 
 // ── Monospace number cell ─────────────────────────────────────
 const Num = ({ v, color }: { v: number; color?: string }) => (
@@ -40,7 +42,21 @@ export const ReportsPage = () => {
     setEditOB,
     openOBModal,
     saveOB,
+    depositStats,
+    depositsByItem,
+    depositSettlements,
+    settleDeposits,
   } = useReports();
+
+  // ── Settle form state ──────────────────────────────────
+  const [settleAmt, setSettleAmt] = useState('');
+  const [settleDate, setSettleDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [settleNote, setSettleNote] = useState('');
+
+  const user: ERPUser | null = (() => {
+    try { return JSON.parse(sessionStorage.getItem('gas-erp-user') ?? 'null'); } catch { return null; }
+  })();
+  const isAdmin = user?.role === 'Admin';
 
   return (
     <Page
@@ -966,6 +982,369 @@ export const ReportsPage = () => {
                 )}
               </tbody>
             </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── DEPOSITS ─────────────────────────────────── */}
+      {tab === 'deposits' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Summary cards */}
+          <div className="erp-grid-3">
+            {[
+              {
+                l: 'Total Collected',
+                v: `\u20B9${depositStats.totalCollected.toLocaleString()}`,
+                c: 'var(--accent)',
+              },
+              {
+                l: 'Total Settled',
+                v: `\u20B9${depositStats.totalSettled.toLocaleString()}`,
+                c: 'var(--green)',
+              },
+              {
+                l: 'Unsettled Balance',
+                v: `\u20B9${depositStats.unsettled.toLocaleString()}`,
+                c: depositStats.unsettled > 0 ? 'var(--red)' : 'var(--green)',
+              },
+            ].map(r => (
+              <div
+                key={r.l}
+                style={{
+                  background: 'var(--canvas)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 12,
+                  padding: '16px 20px',
+                  boxShadow: 'var(--shadow)',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: 'var(--ink3)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '.07em',
+                    marginBottom: 6,
+                  }}
+                >
+                  {r.l}
+                </div>
+                <div
+                  style={{
+                    fontSize: 20,
+                    fontWeight: 900,
+                    color: r.c,
+                    fontFamily: "'JetBrains Mono',monospace",
+                  }}
+                >
+                  {r.v}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Deposits by Item */}
+          <div
+            style={{
+              background: 'var(--canvas)',
+              border: '1px solid var(--border)',
+              borderRadius: 14,
+              overflow: 'clip',
+              boxShadow: 'var(--shadow)',
+            }}
+          >
+            <div
+              style={{
+                padding: '12px 16px',
+                borderBottom: '1px solid var(--border)',
+                fontSize: 13,
+                fontWeight: 800,
+                color: 'var(--ink)',
+              }}
+            >
+              Deposits by Item
+            </div>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <table
+                style={{
+                  width: '100%',
+                  minWidth: 440,
+                  borderCollapse: 'collapse',
+                  fontSize: 13.5,
+                }}
+              >
+                <thead>
+                  <tr style={{ background: 'var(--bg)' }}>
+                    {['Item', 'Qty Sold', 'Deposit/Unit', 'Total Deposit'].map(h => (
+                      <th
+                        key={h}
+                        style={{
+                          padding: '10px 16px',
+                          textAlign: h === 'Item' ? 'left' : 'right',
+                          color: 'var(--ink3)',
+                          fontWeight: 700,
+                          fontSize: 11,
+                          textTransform: 'uppercase',
+                          letterSpacing: '.06em',
+                          borderBottom: '1px solid var(--border)',
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {depositsByItem.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        style={{
+                          padding: '48px 20px',
+                          textAlign: 'center',
+                          color: 'var(--ink3)',
+                        }}
+                      >
+                        No deposit items billed yet
+                      </td>
+                    </tr>
+                  ) : (
+                    depositsByItem.map((d, i) => (
+                      <tr
+                        key={`${d.name}-${d.depositPerUnit}`}
+                        style={{
+                          borderBottom:
+                            i < depositsByItem.length - 1
+                              ? '1px solid var(--border)'
+                              : 'none',
+                        }}
+                        onMouseEnter={e =>
+                          (e.currentTarget.style.background = 'var(--bg)')
+                        }
+                        onMouseLeave={e =>
+                          (e.currentTarget.style.background = 'var(--canvas)')
+                        }
+                      >
+                        <td style={{ padding: '11px 16px', fontWeight: 700, color: 'var(--ink)' }}>
+                          {d.name}
+                        </td>
+                        <td
+                          style={{
+                            padding: '11px 16px',
+                            textAlign: 'right',
+                            color: 'var(--ink3)',
+                          }}
+                        >
+                          {d.qty}
+                        </td>
+                        <td
+                          style={{
+                            padding: '11px 16px',
+                            textAlign: 'right',
+                            fontFamily: "'JetBrains Mono',monospace",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {'\u20B9'}{d.depositPerUnit.toLocaleString()}
+                        </td>
+                        <td
+                          style={{
+                            padding: '11px 16px',
+                            textAlign: 'right',
+                            fontFamily: "'JetBrains Mono',monospace",
+                            fontWeight: 800,
+                            color: 'var(--accent)',
+                          }}
+                        >
+                          {'\u20B9'}{d.totalDeposit.toLocaleString()}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Settle Deposits — Admin only */}
+          {isAdmin && (
+            <div
+              style={{
+                background: 'var(--canvas)',
+                border: '1px solid var(--border)',
+                borderRadius: 14,
+                padding: '16px 20px',
+                boxShadow: 'var(--shadow)',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 800,
+                  color: 'var(--ink)',
+                  marginBottom: 12,
+                }}
+              >
+                Settle Deposits
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <div style={{ flex: '1 1 120px', minWidth: 120 }}>
+                  <Field
+                    label='Amount (\u20B9)'
+                    type='number'
+                    value={settleAmt}
+                    onChange={setSettleAmt}
+                  />
+                </div>
+                <div style={{ flex: '1 1 140px', minWidth: 140 }}>
+                  <Field
+                    label='Date'
+                    type='date'
+                    value={settleDate}
+                    onChange={setSettleDate}
+                  />
+                </div>
+                <div style={{ flex: '2 1 180px', minWidth: 180 }}>
+                  <Field
+                    label='Note'
+                    value={settleNote}
+                    onChange={setSettleNote}
+                  />
+                </div>
+                <Btn
+                  onClick={() => {
+                    settleDeposits(Number(settleAmt), settleDate, settleNote);
+                    setSettleAmt('');
+                    setSettleNote('');
+                  }}
+                >
+                  Settle from Bank
+                </Btn>
+              </div>
+            </div>
+          )}
+
+          {/* Settlement History */}
+          <div
+            style={{
+              background: 'var(--canvas)',
+              border: '1px solid var(--border)',
+              borderRadius: 14,
+              overflow: 'clip',
+              boxShadow: 'var(--shadow)',
+            }}
+          >
+            <div
+              style={{
+                padding: '12px 16px',
+                borderBottom: '1px solid var(--border)',
+                fontSize: 13,
+                fontWeight: 800,
+                color: 'var(--ink)',
+              }}
+            >
+              Settlement History
+            </div>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <table
+                style={{
+                  width: '100%',
+                  minWidth: 440,
+                  borderCollapse: 'collapse',
+                  fontSize: 13.5,
+                }}
+              >
+                <thead>
+                  <tr style={{ background: 'var(--bg)' }}>
+                    {['Date', 'Amount', 'Note', 'Settled By'].map(h => (
+                      <th
+                        key={h}
+                        style={{
+                          padding: '10px 16px',
+                          textAlign: h === 'Amount' ? 'right' : 'left',
+                          color: 'var(--ink3)',
+                          fontWeight: 700,
+                          fontSize: 11,
+                          textTransform: 'uppercase',
+                          letterSpacing: '.06em',
+                          borderBottom: '1px solid var(--border)',
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {depositSettlements.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        style={{
+                          padding: '48px 20px',
+                          textAlign: 'center',
+                          color: 'var(--ink3)',
+                        }}
+                      >
+                        No settlements yet
+                      </td>
+                    </tr>
+                  ) : (
+                    depositSettlements.map((s, i) => (
+                      <tr
+                        key={s.id}
+                        style={{
+                          borderBottom:
+                            i < depositSettlements.length - 1
+                              ? '1px solid var(--border)'
+                              : 'none',
+                        }}
+                        onMouseEnter={e =>
+                          (e.currentTarget.style.background = 'var(--bg)')
+                        }
+                        onMouseLeave={e =>
+                          (e.currentTarget.style.background = 'var(--canvas)')
+                        }
+                      >
+                        <td style={{ padding: '11px 16px', fontWeight: 600 }}>
+                          {s.date}
+                        </td>
+                        <td
+                          style={{
+                            padding: '11px 16px',
+                            textAlign: 'right',
+                            fontFamily: "'JetBrains Mono',monospace",
+                            fontWeight: 800,
+                            color: 'var(--green)',
+                          }}
+                        >
+                          {'\u20B9'}{s.amount.toLocaleString()}
+                        </td>
+                        <td
+                          style={{
+                            padding: '11px 16px',
+                            color: 'var(--ink3)',
+                            fontSize: 12,
+                          }}
+                        >
+                          {s.note || '\u2014'}
+                        </td>
+                        <td
+                          style={{
+                            padding: '11px 16px',
+                            color: 'var(--ink3)',
+                            fontSize: 12,
+                          }}
+                        >
+                          {s.createdBy || '\u2014'}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

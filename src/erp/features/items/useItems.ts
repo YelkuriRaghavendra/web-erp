@@ -11,17 +11,15 @@ type Filter = 'all' | 'active' | 'inactive';
 interface AddForm {
   name: string;
   unit: string;
-  price: string;
+  prices: { price: string; deposit: string }[];
   itemType: ItemType;
-  stockSourceId: string; // empty string = null
 }
 
 const EMPTY_FORM: AddForm = {
   name: '',
   unit: 'Piece',
-  price: '0',
+  prices: [{ price: '0', deposit: '0' }],
   itemType: 'regular',
-  stockSourceId: '',
 };
 
 export const useItems = () => {
@@ -39,8 +37,6 @@ export const useItems = () => {
   const [filter, setFilter] = useState<Filter>('all');
   const [addModal, setAddModal] = useState(false);
   const [form, setForm] = useState<AddForm>(EMPTY_FORM);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editPrice, setEditPrice] = useState('');
 
   // Stock-adjust modal
   const [adjustItem, setAdjustItem] = useState<string | null>(null);
@@ -52,12 +48,11 @@ export const useItems = () => {
     []
   );
 
-  // Reset stockSourceId when item type changes away from 'linked'
+  // Reset item type
   const setItemType = useCallback((v: ItemType) => {
     setForm(p => ({
       ...p,
       itemType: v,
-      stockSourceId: v === 'linked' ? p.stockSourceId : '',
     }));
   }, []);
 
@@ -97,30 +92,33 @@ export const useItems = () => {
     () =>
       items
         .filter(i => i.active)
-        .reduce((s, it) => s + (stock[it.id]?.qty ?? 0) * it.price, 0),
+        .reduce((s, it) => s + (stock[it.id]?.qty ?? 0) * (it.prices[0]?.price ?? 0), 0),
     [items, stock]
   );
 
-  // ── Price editing ─────────────────────────────────────────
-  const startEditPrice = useCallback((id: string, currentPrice: number) => {
-    setEditId(id);
-    setEditPrice(String(currentPrice));
-  }, []);
+  // ── Multi-price management ────────────────────────────────
+  const savePrices = useCallback(
+    (id: string, newPrices: import('../../core/types').ItemPrice[]) => {
+      setItems(prev => {
+        const updated = prev.map(i => (i.id === id ? { ...i, prices: newPrices } : i));
+        syncItems(updated.filter(i => i.id === id));
+        return updated;
+      });
+    },
+    [setItems]
+  );
 
-  const savePrice = useCallback(() => {
-    if (editId === null) return;
-    setItems(p => {
-      const updated = p.map(it =>
-        it.id === editId ? { ...it, price: +editPrice } : it
-      );
-      syncItems(updated);
-      return updated;
-    });
-    setEditId(null);
-    showToast('Price updated');
-  }, [editId, editPrice, setItems, showToast]);
-
-  const cancelEditPrice = useCallback(() => setEditId(null), []);
+  // ── Bundle component management ───────────────────────────
+  const saveBundleComponents = useCallback(
+    (id: string, components: import('../../core/types').BundleComponent[]) => {
+      setItems(prev => {
+        const updated = prev.map(i => (i.id === id ? { ...i, bundleComponents: components } : i));
+        syncItems(updated.filter(i => i.id === id));
+        return updated;
+      });
+    },
+    [setItems]
+  );
 
   // ── Toggle active (with confirmation guard) ───────────────
   const [pendingToggleId, setPendingToggleId] = useState<string | null>(null);
@@ -196,7 +194,7 @@ export const useItems = () => {
     (id: string) => {
       const item = items.find(i => i.id === id);
       setLinkEditId(id);
-      setLinkEditSourceId(item?.stockSourceId ?? '');
+      setLinkEditSourceId(item?.bundleComponents[0]?.componentItemId ?? '');
     },
     [items]
   );
@@ -208,19 +206,29 @@ export const useItems = () => {
         showToast('Select a stock source', 'error');
         return;
       }
+      const sourceName = items.find(i => i.id === sourceId)?.name ?? 'Unknown';
       setItems(p => {
         const updated = p.map(it =>
           it.id === linkEditId
-            ? { ...it, itemType: 'linked' as const, stockSourceId: sourceId }
+            ? {
+                ...it,
+                itemType: 'linked' as const,
+                bundleComponents: [{
+                  id: `link-${Date.now()}`,
+                  componentItemId: sourceId,
+                  componentItemName: sourceName,
+                  qty: 1,
+                }],
+              }
             : it
         );
-        syncItems(updated);
+        syncItems(updated.filter(i => i.id === linkEditId));
         return updated;
       });
       setLinkEditId(null);
       showToast('Item linked to stock source');
     },
-    [linkEditId, setItems, showToast]
+    [linkEditId, items, setItems, showToast]
   );
 
   const unlinkItem = useCallback(
@@ -228,10 +236,10 @@ export const useItems = () => {
       setItems(p => {
         const updated = p.map(it =>
           it.id === id
-            ? { ...it, itemType: 'regular' as const, stockSourceId: null }
+            ? { ...it, itemType: 'regular' as const, bundleComponents: [] }
             : it
         );
-        syncItems(updated);
+        syncItems(updated.filter(i => i.id === id));
         return updated;
       });
       showToast('Item unlinked');
@@ -247,23 +255,26 @@ export const useItems = () => {
       showToast('Name required', 'error');
       return;
     }
-    if (form.itemType === 'linked' && !form.stockSourceId) {
-      showToast('Select a stock source for this linked item', 'error');
+    const parsedPrices = form.prices
+      .map(p => ({ price: parseFloat(p.price), deposit: parseFloat(p.deposit) || 0 }))
+      .filter(p => !isNaN(p.price) && p.price >= 0);
+    if (parsedPrices.length === 0) {
+      showToast('At least one valid price is required', 'error');
       return;
     }
     try {
-      const stockSourceId =
-        form.itemType === 'linked' && form.stockSourceId
-          ? form.stockSourceId
-          : null;
-
       const newId = await insertItem({
         name: form.name,
         unit: form.unit,
-        price: +form.price,
+        prices: parsedPrices.map((p, idx) => ({
+          id: `temp-${idx}`,
+          price: p.price,
+          deposit: p.deposit,
+          sortOrder: idx,
+        })),
         active: true,
         itemType: form.itemType,
-        stockSourceId,
+        bundleComponents: [],
       });
       await insertStockRow(newId);
 
@@ -273,10 +284,15 @@ export const useItems = () => {
           id: newId,
           name: form.name,
           unit: form.unit,
-          price: +form.price,
+          prices: parsedPrices.map((p, idx) => ({
+            id: `temp-${idx}`,
+            price: p.price,
+            deposit: p.deposit,
+            sortOrder: idx,
+          })),
           active: true,
           itemType: form.itemType,
-          stockSourceId,
+          bundleComponents: [],
         },
       ]);
       setStock(p => ({ ...p, [newId]: { qty: 0 } }));
@@ -313,12 +329,8 @@ export const useItems = () => {
     setItemType,
     addItem,
     // price editing
-    editId,
-    editPrice,
-    setEditPrice,
-    startEditPrice,
-    savePrice,
-    cancelEditPrice,
+    savePrices,
+    saveBundleComponents,
     // toggle
     toggleItem,
     pendingToggleId,

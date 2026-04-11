@@ -3,6 +3,8 @@ import type {
   Bill,
   Purchase,
   Item,
+  ItemPrice,
+  BundleComponent,
   ItemType,
   Customer,
   Stock,
@@ -11,6 +13,7 @@ import type {
   Transaction,
   OpeningBalances,
   LedgerEntry,
+  DepositSettlement,
 } from './types';
 
 // ── Client ────────────────────────────────────────────────────
@@ -53,24 +56,71 @@ const audit = (r: Record<string, unknown>) => ({
 // ════════════════════════════════════════════════════════════════
 
 export const fetchAllItems = async (): Promise<Item[]> => {
-  const { data, error } = await supabase
+  // 1. Fetch items
+  const { data: itemRows, error: itemErr } = await supabase
     .from('items')
     .select('*')
     .order('name');
-  if (error) {
-    console.warn('[Supabase] fetchAllItems:', error);
-    return [];
-  }
-  return (data ?? []).map(r => ({
-    id: String(r.item_id),
-    name: r.name as string,
-    unit: (r.unit ?? 'Nos') as string,
-    price: Number(r.price),
-    active: r.active as boolean,
-    itemType: ((r.item_type as string) || 'regular') as ItemType,
-    stockSourceId: r.stock_source_id != null ? String(r.stock_source_id) : null,
-    ...audit(r as Record<string, unknown>),
-  }));
+  if (itemErr) { console.warn('[Supabase] fetchAllItems:', itemErr); return []; }
+  if (!itemRows) return [];
+
+  // 2. Fetch all prices
+  const { data: priceRows } = await supabase
+    .from('item_prices')
+    .select('*')
+    .order('sort_order', { ascending: true });
+
+  // 3. Fetch all bundle components
+  const { data: bundleRows } = await supabase
+    .from('bundle_components')
+    .select('*');
+
+  // 4. Name lookup for component items
+  const nameMap: Record<string, string> = {};
+  itemRows.forEach((r: Record<string, unknown>) => {
+    nameMap[String(r.item_id)] = String(r.name);
+  });
+
+  // 5. Group prices by item_id
+  const pricesByItem: Record<string, ItemPrice[]> = {};
+  (priceRows ?? []).forEach((r: Record<string, unknown>) => {
+    const itemId = String(r.item_id);
+    if (!pricesByItem[itemId]) pricesByItem[itemId] = [];
+    pricesByItem[itemId].push({
+      id: String(r.id),
+      price: Number(r.price),
+      deposit: Number(r.deposit ?? 0),
+      sortOrder: Number(r.sort_order),
+    });
+  });
+
+  // 6. Group bundle components by bundle_item_id
+  const componentsByBundle: Record<string, BundleComponent[]> = {};
+  (bundleRows ?? []).forEach((r: Record<string, unknown>) => {
+    const bundleId = String(r.bundle_item_id);
+    if (!componentsByBundle[bundleId]) componentsByBundle[bundleId] = [];
+    componentsByBundle[bundleId].push({
+      id: String(r.id),
+      componentItemId: String(r.component_item_id),
+      componentItemName: nameMap[String(r.component_item_id)] ?? 'Unknown',
+      qty: Number(r.qty),
+    });
+  });
+
+  // 7. Assemble items
+  return itemRows.map((r: Record<string, unknown>) => {
+    const id = String(r.item_id);
+    return {
+      id,
+      name: String(r.name),
+      unit: String(r.unit ?? 'Nos'),
+      prices: pricesByItem[id] ?? [],
+      active: Boolean(r.active),
+      itemType: ((r.item_type as string) || 'regular') as ItemType,
+      bundleComponents: componentsByBundle[id] ?? [],
+      ...audit(r),
+    };
+  });
 };
 
 export const fetchStock = async (): Promise<Stock> => {
@@ -132,6 +182,7 @@ export const fetchBills = async (): Promise<Bill[]> => {
         itemName: line.item_name as string,
         qty: Number(line.qty),
         price: Number(line.price),
+        deposit: Number(line.deposit ?? 0),
         amount: Number(line.amount),
       };
     }),
@@ -152,6 +203,8 @@ export const fetchPurchases = async (): Promise<Purchase[]> => {
     id: p.purchase_id as string,
     date: p.date as string,
     note: (p.note ?? '') as string,
+    vehicleNo: (p.vehicle_no ?? '') as string,
+    salesOrderRef: (p.sales_order_ref ?? '') as string,
     grandTotal: Number(p.grand_total),
     lines: ((p.purchase_lines as unknown[]) ?? []).map((l: unknown) => {
       const line = l as Record<string, unknown>;
@@ -201,6 +254,22 @@ export const fetchOpeningBalances = async (): Promise<OpeningBalances> => {
     };
   });
   return ob;
+};
+
+export const fetchDepositSettlements = async (): Promise<DepositSettlement[]> => {
+  const { data, error } = await supabase
+    .from('deposit_settlements')
+    .select('*')
+    .order('date', { ascending: false });
+  if (error) { console.warn('[Supabase] fetchDepositSettlements:', error); return []; }
+  return (data ?? []).map(r => ({
+    id: String(r.id),
+    date: r.date as string,
+    amount: Number(r.amount),
+    note: (r.note ?? '') as string,
+    createdAt: ts(r.created_at),
+    createdBy: (r.created_by as string) || undefined,
+  }));
 };
 
 /** Staff list for management page — password is NEVER sent to the browser. */
@@ -293,22 +362,46 @@ export const fetchCurrentUserStatus = async (
 
 /** Insert a new item row; returns the DB-generated item_id as string. */
 export const insertItem = async (data: Omit<Item, 'id'>): Promise<string> => {
+  // 1. Insert item row (no price or stock_source_id columns anymore)
   const { data: row, error } = await supabase
     .from('items')
     .insert({
       name: data.name,
       unit: data.unit,
-      price: data.price,
       active: data.active,
       item_type: data.itemType ?? 'regular',
-      stock_source_id: data.stockSourceId ? Number(data.stockSourceId) : null,
       created_by: _currentUser,
       updated_by: _currentUser,
     })
     .select('item_id')
     .single();
   if (error) throw error;
-  return String((row as { item_id: unknown }).item_id);
+  const itemId = String((row as { item_id: unknown }).item_id);
+
+  // 2. Insert prices
+  if (data.prices.length > 0) {
+    await supabase.from('item_prices').insert(
+      data.prices.map((p, idx) => ({
+        item_id: Number(itemId),
+        price: p.price,
+        deposit: p.deposit ?? 0,
+        sort_order: p.sortOrder ?? idx,
+      }))
+    );
+  }
+
+  // 3. Insert bundle components (for linked items)
+  if (data.bundleComponents.length > 0) {
+    await supabase.from('bundle_components').insert(
+      data.bundleComponents.map(c => ({
+        bundle_item_id: Number(itemId),
+        component_item_id: Number(c.componentItemId),
+        qty: c.qty,
+      }))
+    );
+  }
+
+  return itemId;
 };
 
 /** Insert a stock row with qty=0 for a newly created item. */
@@ -413,6 +506,7 @@ export const syncBill = (bill: Bill) => {
           item_name: l.itemName,
           qty: l.qty,
           price: l.price,
+          deposit: l.deposit ?? 0,
           amount: l.amount,
           created_by: _currentUser,
           updated_by: _currentUser,
@@ -428,6 +522,8 @@ export const syncPurchase = (po: Purchase) => {
     purchase_id: po.id,
     date: po.date,
     note: po.note,
+    vehicle_no: po.vehicleNo ?? '',
+    sales_order_ref: po.salesOrderRef ?? '',
     grand_total: po.grandTotal,
     created_by: _currentUser,
     updated_by: _currentUser,
@@ -473,6 +569,7 @@ export const syncBillUpdate = (bill: Bill) => {
           item_name: l.itemName,
           qty: l.qty,
           price: l.price,
+          deposit: l.deposit ?? 0,
           amount: l.amount,
           created_by: _currentUser,
           updated_by: _currentUser,
@@ -488,6 +585,8 @@ export const syncPurchaseUpdate = (po: Purchase) => {
     purchase_id: po.id,
     date: po.date,
     note: po.note,
+    vehicle_no: po.vehicleNo ?? '',
+    sales_order_ref: po.salesOrderRef ?? '',
     grand_total: po.grandTotal,
     updated_by: _currentUser,
   }).then(({ error }) => {
@@ -510,23 +609,44 @@ export const syncPurchaseUpdate = (po: Purchase) => {
   });
 };
 
-export const syncItems = (items: Item[]) => {
-  bg(
-    'upsert items',
-    supabase.from('items').upsert(
-      items.map(i => ({
-        item_id: i.id,
-        name: i.name,
-        unit: i.unit,
-        price: i.price,
-        active: i.active,
-        item_type: i.itemType ?? 'regular',
-        stock_source_id: i.stockSourceId ? Number(i.stockSourceId) : null,
-        created_by: _currentUser,
-        updated_by: _currentUser,
-      }))
-    )
-  );
+export const syncItems = async (items: Item[]) => {
+  for (const item of items) {
+    // 1. Upsert item row
+    bg('upsert item', supabase.from('items').upsert({
+      item_id: item.id,
+      name: item.name,
+      unit: item.unit,
+      active: item.active,
+      item_type: item.itemType ?? 'regular',
+      updated_at: new Date().toISOString(),
+      updated_by: _currentUser,
+    }));
+
+    // 2. Replace prices: delete old, insert new
+    await supabase.from('item_prices').delete().eq('item_id', Number(item.id));
+    if (item.prices.length > 0) {
+      await supabase.from('item_prices').insert(
+        item.prices.map((p, idx) => ({
+          item_id: Number(item.id),
+          price: p.price,
+          deposit: p.deposit ?? 0,
+          sort_order: p.sortOrder ?? idx,
+        }))
+      );
+    }
+
+    // 3. Replace bundle components: delete old, insert new
+    await supabase.from('bundle_components').delete().eq('bundle_item_id', Number(item.id));
+    if (item.bundleComponents.length > 0) {
+      await supabase.from('bundle_components').insert(
+        item.bundleComponents.map(c => ({
+          bundle_item_id: Number(item.id),
+          component_item_id: Number(c.componentItemId),
+          qty: c.qty,
+        }))
+      );
+    }
+  }
 };
 
 export const syncStock = (stock: Stock) => {
@@ -589,6 +709,15 @@ export const syncOpeningBalance = (
   );
 };
 
+export const syncDepositSettlement = (s: DepositSettlement) => {
+  bg('insert deposit_settlement', supabase.from('deposit_settlements').insert({
+    date: s.date,
+    amount: s.amount,
+    note: s.note,
+    created_by: _currentUser,
+  }));
+};
+
 export const syncStaffMember = (s: StaffUser) => {
   // s.p is '' when loaded via fetchAllStaff (password never fetched in list view).
   // Only include the password column when we actually have a hash to write,
@@ -605,4 +734,77 @@ export const syncStaffMember = (s: StaffUser) => {
   };
   if (s.p) payload.password = s.p; // only set when resetting a password
   bg('upsert staff', supabase.from('staff').upsert(payload));
+};
+
+// ════════════════════════════════════════════════════════════════
+//  MIGRATIONS — auto-run on bootstrap
+// ════════════════════════════════════════════════════════════════
+//
+// Migration SQL files live in db/migrations/ and are imported as
+// raw strings via Vite's ?raw suffix. Each migration runs once —
+// the _migrations table tracks which versions have been applied.
+// ────────────────────────────────────────────────────────────────
+
+import migration001 from '../../../db/migrations/20260411_001_full_schema.sql?raw';
+
+interface Migration {
+  version: number;
+  name: string;
+  up: string; // raw SQL imported from db/migrations/
+}
+
+const MIGRATIONS: Migration[] = [
+  {
+    version: 1,
+    name: '20260411_001_full_schema',
+    up: migration001,
+  },
+];
+
+/**
+ * Run pending migrations. Tracks applied versions in `_migrations` table.
+ * Safe to call on every bootstrap — already-applied migrations are skipped.
+ */
+export const runMigrations = async (): Promise<void> => {
+  // Ensure _migrations tracking table exists
+  await supabase.rpc('exec_sql', {
+    sql: `
+      CREATE TABLE IF NOT EXISTS public._migrations (
+        version  int PRIMARY KEY,
+        name     text NOT NULL,
+        applied_at timestamptz NOT NULL DEFAULT now()
+      );
+    `,
+  }).then(({ error }) => {
+    if (error) {
+      console.warn('[Migrations] exec_sql RPC not available — run db/migrations/20260411_001_full_schema.sql manually');
+    }
+  });
+
+  // Check which migrations have been applied
+  const { data: applied } = await supabase
+    .from('_migrations')
+    .select('version');
+
+  const appliedVersions = new Set(
+    (applied ?? []).map((r: { version: number }) => r.version)
+  );
+
+  for (const migration of MIGRATIONS) {
+    if (appliedVersions.has(migration.version)) continue;
+
+    console.log(`[Migrations] Running ${migration.name}...`);
+    const { error } = await supabase.rpc('exec_sql', { sql: migration.up });
+    if (error) {
+      console.error(`[Migrations] Failed ${migration.name}:`, error);
+      continue;
+    }
+
+    // Record migration as applied
+    await supabase.from('_migrations').insert({
+      version: migration.version,
+      name: migration.name,
+    });
+    console.log(`[Migrations] Completed ${migration.name}`);
+  }
 };

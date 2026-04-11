@@ -3,7 +3,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { useERPStore } from '../../core/store';
 import { useToast } from '../../shared/hooks/useToast';
 import { ym, monthLabel, allMonths } from '../../core/constants';
-import { syncOpeningBalance } from '../../core/supabase';
+import { syncOpeningBalance, syncDepositSettlement, syncTransaction } from '../../core/supabase';
+import type { DepositSettlement, Transaction } from '../../core/types';
 
 // ── Reports tabs ───────────────────────────────────────────────
 // The Cash Book lives in the Cash & Bank page (/accounts), not here.
@@ -13,6 +14,7 @@ export const TABS = [
   { id: 'daily', l: 'Sales Report' },
   { id: 'credit', l: 'Credit Report' },
   { id: 'purchase', l: 'Purchases' },
+  { id: 'deposits', l: 'Deposits' },
 ] as const;
 
 export const useReports = () => {
@@ -25,6 +27,9 @@ export const useReports = () => {
     openingBalances,
     setOpeningBalances,
     transactions,
+    depositSettlements,
+    setDepositSettlements,
+    setTransactions,
   } = useERPStore(
     useShallow(s => ({
       bills: s.bills,
@@ -35,6 +40,9 @@ export const useReports = () => {
       openingBalances: s.openingBalances,
       setOpeningBalances: s.setOpeningBalances,
       transactions: s.transactions, // needed for expense totals in P&L
+      depositSettlements: s.depositSettlements,
+      setDepositSettlements: s.setDepositSettlements,
+      setTransactions: s.setTransactions,
     }))
   );
   const showToast = useToast();
@@ -69,6 +77,66 @@ export const useReports = () => {
     setEditOB(null);
     showToast('Opening balances saved');
   }, [editOB, setOpeningBalances, showToast]);
+
+  // ── Deposit stats ────────────────────────────────────────
+  const depositStats = useMemo(() => {
+    const totalCollected = bills.reduce(
+      (s, b) => s + b.lines.reduce((ls, l) => ls + l.qty * l.deposit, 0),
+      0
+    );
+    const totalSettled = depositSettlements.reduce((s, d) => s + d.amount, 0);
+    return {
+      totalCollected,
+      totalSettled,
+      unsettled: totalCollected - totalSettled,
+    };
+  }, [bills, depositSettlements]);
+
+  // ── Deposits by item ───────────────────────────────────
+  const depositsByItem = useMemo(() => {
+    const map: Record<string, { name: string; qty: number; depositPerUnit: number; totalDeposit: number }> = {};
+    bills.forEach(b => {
+      b.lines.forEach(l => {
+        if (l.deposit <= 0) return;
+        const key = `${l.itemId}-${l.deposit}`;
+        if (!map[key]) map[key] = { name: l.itemName, qty: 0, depositPerUnit: l.deposit, totalDeposit: 0 };
+        map[key].qty += l.qty;
+        map[key].totalDeposit += l.qty * l.deposit;
+      });
+    });
+    return Object.values(map).sort((a, b) => b.totalDeposit - a.totalDeposit);
+  }, [bills]);
+
+  // ── Settle deposits ────────────────────────────────────
+  const settleDeposits = useCallback((amount: number, date: string, note: string) => {
+    if (amount <= 0) {
+      showToast('Enter a valid amount', 'error');
+      return;
+    }
+
+    const settlement: DepositSettlement = {
+      id: `DS-${Date.now()}`,
+      date,
+      amount,
+      note,
+      createdBy: JSON.parse(sessionStorage.getItem('gas-erp-user') ?? '{}')?.u ?? '',
+    };
+
+    setDepositSettlements(prev => [settlement, ...prev]);
+    syncDepositSettlement(settlement);
+
+    const txn: Transaction = {
+      id: `TXN-${Date.now()}`,
+      date,
+      type: 'DEPOSIT_SETTLEMENT',
+      amount,
+      note: note || 'Deposit settlement to company',
+    };
+    setTransactions(prev => [txn, ...prev]);
+    syncTransaction(txn);
+
+    showToast(`Settled \u20B9${amount.toLocaleString()} from bank`, 'success');
+  }, [setDepositSettlements, setTransactions, showToast]);
 
   // ── Monthly P&L data ──────────────────────────────────────
   const months = useMemo(() => allMonths(bills, purchases), [bills, purchases]);
@@ -116,9 +184,12 @@ export const useReports = () => {
         const addToCash = mTxns
           .filter(t => t.type === 'ADD_TO_CASH')
           .reduce((s, t) => s + t.amount, 0);
+        const depositSettled = mTxns
+          .filter(t => t.type === 'DEPOSIT_SETTLEMENT')
+          .reduce((s, t) => s + t.amount, 0);
         const ob = openingBalances[m] ?? { cash: 0, bank: 0 };
         const cashCB = ob.cash + cashSales + bankToCash + addToCash - cashToBank - expCash;
-        const bankCB = ob.bank + upiSales + cashToBank + addToBank - bankToCash - expBank;
+        const bankCB = ob.bank + upiSales + cashToBank + addToBank - bankToCash - expBank - depositSettled;
 
         const grossProfit = total - purchaseCost;
         const netProfit = total - purchaseCost - totalExpenses;
@@ -140,6 +211,8 @@ export const useReports = () => {
           bankCB,
           billCount: mBills.length,
           purchaseCount: mPurchases.length,
+          totalDeposits: mBills.reduce((s, b) => s + b.lines.reduce((ls, l) => ls + l.qty * l.deposit, 0), 0),
+          depositSettled,
         };
       }),
     [months, bills, purchases, transactions, openingBalances]
@@ -175,7 +248,7 @@ export const useReports = () => {
 
   // ── Purchase report ───────────────────────────────────────
   const inventoryValue = useMemo(
-    () => items.reduce((s, it) => s + (stock[it.id]?.qty ?? 0) * it.price, 0),
+    () => items.reduce((s, it) => s + (stock[it.id]?.qty ?? 0) * (it.prices[0]?.price ?? 0), 0),
     [items, stock]
   );
 
@@ -195,5 +268,9 @@ export const useReports = () => {
     setEditOB,
     openOBModal,
     saveOB,
+    depositStats,
+    depositsByItem,
+    depositSettlements,
+    settleDeposits,
   };
 };

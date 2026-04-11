@@ -104,6 +104,16 @@ const PurchaseDetailModal = ({
                   📝 {po.note}
                 </span>
               )}
+              {po.vehicleNo && (
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,.5)' }}>
+                  🚛 {po.vehicleNo}
+                </span>
+              )}
+              {po.salesOrderRef && (
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,.5)' }}>
+                  📋 {po.salesOrderRef}
+                </span>
+              )}
             </div>
           </div>
           <button
@@ -388,6 +398,8 @@ const PurchaseEditModal = ({
 }) => {
   const [date, setDate] = useState(po.date);
   const [note, setNote] = useState(po.note);
+  const [vehicleNo, setVehicleNo] = useState(po.vehicleNo ?? '');
+  const [salesOrderRef, setSalesOrderRef] = useState(po.salesOrderRef ?? '');
   const [editLines, setEditLines] = useState(
     po.lines.map(l => ({ ...l, qtyStr: String(l.qty), rateStr: String(l.rate) }))
   );
@@ -448,6 +460,16 @@ const PurchaseEditModal = ({
               <input type="text" value={note} onChange={e => setNote(e.target.value)} placeholder="Optional note" style={inp} />
             </div>
           </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 6 }}>Vehicle No</label>
+              <input type="text" value={vehicleNo} onChange={e => setVehicleNo(e.target.value)} placeholder="e.g. KA-01-AB-1234" style={inp} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 6 }}>Sales Order Ref</label>
+              <input type="text" value={salesOrderRef} onChange={e => setSalesOrderRef(e.target.value)} placeholder="SO reference" style={inp} />
+            </div>
+          </div>
 
           {/* Line items */}
           <div>
@@ -488,7 +510,7 @@ const PurchaseEditModal = ({
           <button
             onClick={() => {
               if (!newLines.length) return;
-              onSave({ ...po, date, note, lines: newLines, grandTotal: newGrandTotal });
+              onSave({ ...po, date, note, vehicleNo, salesOrderRef, lines: newLines, grandTotal: newGrandTotal });
             }}
             disabled={newLines.length === 0}
             style={{ padding: '9px 24px', borderRadius: 10, border: 'none', background: newLines.length ? 'var(--green)' : 'var(--border)', color: newLines.length ? '#fff' : 'var(--ink3)', fontSize: 13, fontWeight: 700, cursor: newLines.length ? 'pointer' : 'not-allowed', fontFamily: "'Plus Jakarta Sans',sans-serif" }}
@@ -502,12 +524,15 @@ const PurchaseEditModal = ({
 };
 
 // ── Purchase history table with search + sort ─────────────────
-type PSortCol = 'id' | 'date' | 'lines' | 'grandTotal';
+type PSortCol = 'id' | 'date' | 'vehicleNo' | 'salesOrderRef' | 'lines' | 'grandTotal';
 type PSortDir = 'asc' | 'desc';
 
 const BASE_P_COLS: { key: PSortCol | null; label: string; align: 'left' | 'right' }[] = [
+  { key: null, label: 'S.No', align: 'left' },
   { key: 'id', label: 'PO No.', align: 'left' },
   { key: 'date', label: 'Date', align: 'left' },
+  { key: 'vehicleNo', label: 'Vehicle No', align: 'left' },
+  { key: 'salesOrderRef', label: 'SO Ref', align: 'left' },
   { key: 'lines', label: 'Items', align: 'right' },
   { key: 'grandTotal', label: 'Total', align: 'right' },
   { key: null, label: '', align: 'left' }, // eye column
@@ -530,8 +555,8 @@ const PurchasesTable = ({
     ? [...BASE_P_COLS, { key: null as PSortCol | null, label: '', align: 'left' as const }]
     : BASE_P_COLS;
   const P_GRID = isAdmin
-    ? '140px 120px 120px 140px 48px 48px'
-    : '140px 120px 120px 140px 48px';
+    ? '40px 1fr 1fr 1fr 1fr 80px 1fr 40px 40px'
+    : '40px 1fr 1fr 1fr 1fr 80px 1fr 40px';
 
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -554,10 +579,12 @@ const PurchasesTable = ({
     .filter(p => ym(p.date) === selectedMonth)
     .filter(p => {
       const q = search.toLowerCase();
-      const matchSearch =
+      const matchSearch = !q ||
         p.id.toLowerCase().includes(q) ||
         p.date.includes(q) ||
-        (p.note ?? '').toLowerCase().includes(q);
+        (p.note ?? '').toLowerCase().includes(q) ||
+        (p.vehicleNo ?? '').toLowerCase().includes(q) ||
+        (p.salesOrderRef ?? '').toLowerCase().includes(q);
       const matchFrom = !dateFrom || p.date >= dateFrom;
       const matchTo = !dateTo || p.date <= dateTo;
       return matchSearch && matchFrom && matchTo;
@@ -566,6 +593,8 @@ const PurchasesTable = ({
       let cmp = 0;
       if (sortCol === 'id') cmp = a.id.localeCompare(b.id);
       else if (sortCol === 'date') cmp = a.date.localeCompare(b.date);
+      else if (sortCol === 'vehicleNo') cmp = (a.vehicleNo ?? '').localeCompare(b.vehicleNo ?? '');
+      else if (sortCol === 'salesOrderRef') cmp = (a.salesOrderRef ?? '').localeCompare(b.salesOrderRef ?? '');
       else if (sortCol === 'lines') cmp = a.lines.length - b.lines.length;
       else if (sortCol === 'grandTotal') cmp = a.grandTotal - b.grandTotal;
       return sortDir === 'asc' ? cmp : -cmp;
@@ -642,7 +671,7 @@ const PurchasesTable = ({
             background: 'var(--canvas)',
             border: '1px solid var(--border)',
             borderRadius: 14,
-            overflow: 'hidden',
+            overflow: 'auto',
             boxShadow: 'var(--shadow2)',
           }}
         >
@@ -834,6 +863,17 @@ const PurchasesTable = ({
                   e.currentTarget.style.background = 'var(--canvas)';
                 }}
               >
+                {/* S.No */}
+                <div
+                  style={{
+                    padding: '14px 14px',
+                    fontSize: 12,
+                    color: 'var(--ink3)',
+                    fontWeight: 600,
+                  }}
+                >
+                  {idx + 1}
+                </div>
                 {/* PO No */}
                 <div
                   style={{
@@ -842,6 +882,7 @@ const PurchasesTable = ({
                     fontSize: 12,
                     color: 'var(--green)',
                     fontWeight: 700,
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {po.id}
@@ -852,9 +893,32 @@ const PurchasesTable = ({
                     padding: '14px 14px',
                     fontSize: 13,
                     color: 'var(--ink2)',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {po.date}
+                </div>
+                {/* Vehicle No */}
+                <div
+                  style={{
+                    padding: '14px 14px',
+                    fontSize: 12,
+                    color: 'var(--ink2)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {po.vehicleNo || '—'}
+                </div>
+                {/* SO Ref */}
+                <div
+                  style={{
+                    padding: '14px 14px',
+                    fontSize: 12,
+                    color: 'var(--ink2)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {po.salesOrderRef || '—'}
                 </div>
                 {/* Items count */}
                 <div
@@ -864,6 +928,7 @@ const PurchasesTable = ({
                     fontSize: 13,
                     color: 'var(--ink3)',
                     fontWeight: 600,
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {po.lines.length} item{po.lines.length !== 1 ? 's' : ''}
@@ -927,6 +992,10 @@ export const PurchasePage = () => {
     setDate,
     note,
     setNote,
+    vehicleNo,
+    setVehicleNo,
+    salesOrderRef,
+    setSalesOrderRef,
     rows,
     setRowField,
     activeItems,
@@ -1389,6 +1458,48 @@ export const PurchasePage = () => {
                     value={note}
                     onChange={e => setNote(e.target.value)}
                     placeholder='Optional note…'
+                    style={inputSt}
+                  />
+                </div>
+                <div>
+                  <div
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: 800,
+                      color: 'var(--ink3)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '.07em',
+                      marginBottom: 5,
+                    }}
+                  >
+                    Vehicle No
+                  </div>
+                  <input
+                    type='text'
+                    value={vehicleNo}
+                    onChange={e => setVehicleNo(e.target.value)}
+                    placeholder='e.g. KA-01-AB-1234'
+                    style={inputSt}
+                  />
+                </div>
+                <div>
+                  <div
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: 800,
+                      color: 'var(--ink3)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '.07em',
+                      marginBottom: 5,
+                    }}
+                  >
+                    Sales Order Ref
+                  </div>
+                  <input
+                    type='text'
+                    value={salesOrderRef}
+                    onChange={e => setSalesOrderRef(e.target.value)}
+                    placeholder='SO reference…'
                     style={inputSt}
                   />
                 </div>

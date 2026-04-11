@@ -274,7 +274,7 @@ export const DashboardPage = () => {
 
   // ── Inventory value ───────────────────────────────────────────
   const invValue = useMemo(
-    () => items.reduce((s, it) => s + (stock[it.id]?.qty ?? 0) * it.price, 0),
+    () => items.reduce((s, it) => s + (stock[it.id]?.qty ?? 0) * (it.prices[0]?.price ?? 0), 0),
     [items, stock]
   );
 

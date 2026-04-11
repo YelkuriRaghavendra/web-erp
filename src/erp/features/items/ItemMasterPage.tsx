@@ -1,6 +1,7 @@
-import { Btn, Field, Modal, Row, Badge } from '../../shared/components/ui';
+import { useState } from 'react';
+import { Btn, Field, Modal, Badge } from '../../shared/components/ui';
 import { useItems } from './useItems';
-import type { ItemType } from '../../core/types';
+import type { ItemType, ItemPrice } from '../../core/types';
 
 // Human-readable labels for itemType values
 const TYPE_LABELS: Record<ItemType, string> = {
@@ -31,12 +32,8 @@ export const ItemMasterPage = () => {
     setField,
     setItemType,
     addItem,
-    editId,
-    editPrice,
-    setEditPrice,
-    startEditPrice,
-    savePrice,
-    cancelEditPrice,
+    savePrices,
+    // saveBundleComponents — available for future bundle component UI
     toggleItem,
     pendingToggleItem,
     requestToggle,
@@ -58,14 +55,42 @@ export const ItemMasterPage = () => {
     closeLinkEdit,
   } = useItems();
 
+  // ── Inline price editing state ────────────────────────────
+  const [editingPricesId, setEditingPricesId] = useState<string | null>(null);
+  const [editingPricesValues, setEditingPricesValues] = useState<{ price: string; deposit: string }[]>([]);
+
+  const startEditPrices = (id: string, currentPrices: ItemPrice[]) => {
+    setEditingPricesId(id);
+    setEditingPricesValues(currentPrices.map(p => ({ price: String(p.price), deposit: String(p.deposit ?? 0) })));
+  };
+
+  const cancelEditPrices = () => {
+    setEditingPricesId(null);
+    setEditingPricesValues([]);
+  };
+
+  const saveEditedPrices = (id: string) => {
+    const parsed = editingPricesValues
+      .map(v => ({ price: parseFloat(v.price), deposit: parseFloat(v.deposit) || 0 }))
+      .filter(v => !isNaN(v.price) && v.price >= 0);
+    if (parsed.length === 0) return;
+    savePrices(
+      id,
+      parsed.map((p, idx) => ({ id: `p-${Date.now()}-${idx}`, price: p.price, deposit: p.deposit, sortOrder: idx }))
+    );
+    setEditingPricesId(null);
+    setEditingPricesValues([]);
+  };
+
   // ── Shared table row renderer ─────────────────────────────
   const renderTableRow = (item: (typeof otherItems)[0], idx: number, arr: typeof otherItems) => {
     const qty = stock[item.id]?.qty ?? 0;
-    const val = qty * item.price;
-    const isEditing = editId === item.id;
+    const primaryPrice = item.prices[0]?.price ?? 0;
+    const val = qty * primaryPrice;
+    const isEditing = editingPricesId === item.id;
     const srcItem =
-      item.itemType === 'linked' && item.stockSourceId
-        ? items.find(i => i.id === item.stockSourceId)
+      item.itemType === 'linked' && item.bundleComponents.length > 0
+        ? items.find(i => i.id === item.bundleComponents[0].componentItemId)
         : null;
 
     return (
@@ -118,62 +143,99 @@ export const ItemMasterPage = () => {
             <div
               style={{
                 display: 'flex',
-                gap: 5,
-                justifyContent: 'flex-end',
-                alignItems: 'center',
+                flexDirection: 'column',
+                gap: 4,
+                alignItems: 'flex-end',
               }}
             >
-              <span style={{ fontSize: 13, color: 'var(--ink3)' }}>₹</span>
-              <input
-                type='number'
-                value={editPrice}
-                onChange={e => setEditPrice(e.target.value)}
-                autoFocus
-                style={{
-                  width: 80,
-                  background: 'var(--canvas)',
-                  border: '2px solid var(--accent)',
-                  borderRadius: 7,
-                  padding: '5px 8px',
-                  fontSize: 14,
-                  fontWeight: 700,
-                  fontFamily: "'JetBrains Mono',monospace",
-                  outline: 'none',
-                  textAlign: 'right',
-                  color: 'var(--ink)',
-                }}
-              />
-              <button
-                onClick={() => savePrice()}
-                style={{
-                  padding: '5px 9px',
-                  borderRadius: 6,
-                  border: 'none',
-                  background: 'var(--accent)',
-                  color: '#fff',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  fontFamily: "'Plus Jakarta Sans',sans-serif",
-                }}
-              >
-                ✓
-              </button>
-              <button
-                onClick={cancelEditPrice}
-                style={{
-                  padding: '5px 9px',
-                  borderRadius: 6,
-                  border: '1px solid var(--border2)',
-                  background: 'transparent',
-                  color: 'var(--ink3)',
-                  fontSize: 11,
-                  cursor: 'pointer',
-                  fontFamily: "'Plus Jakarta Sans',sans-serif",
-                }}
-              >
-                ✕
-              </button>
+              {editingPricesValues.map((pv, pi) => (
+                <div key={pi} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <span style={{ fontSize: 13, color: 'var(--ink3)' }}>₹</span>
+                  <input
+                    type='number'
+                    value={pv.price}
+                    onChange={e => {
+                      const next = [...editingPricesValues];
+                      next[pi] = { ...next[pi], price: e.target.value };
+                      setEditingPricesValues(next);
+                    }}
+                    autoFocus={pi === 0}
+                    style={{
+                      width: 80,
+                      background: 'var(--canvas)',
+                      border: '2px solid var(--accent)',
+                      borderRadius: 7,
+                      padding: '5px 8px',
+                      fontSize: 14,
+                      fontWeight: 700,
+                      fontFamily: "'JetBrains Mono',monospace",
+                      outline: 'none',
+                      textAlign: 'right',
+                      color: 'var(--ink)',
+                    }}
+                  />
+                  <input
+                    type='number'
+                    placeholder='Deposit'
+                    value={pv.deposit}
+                    onChange={e => {
+                      const next = [...editingPricesValues];
+                      next[pi] = { ...next[pi], deposit: e.target.value };
+                      setEditingPricesValues(next);
+                    }}
+                    style={{
+                      width: 80, padding: '6px 10px', background: 'var(--bg)',
+                      border: '1px solid var(--border2)', borderRadius: 6,
+                      fontSize: 13, fontFamily: "'JetBrains Mono',monospace",
+                      fontWeight: 600, color: 'var(--amber)', outline: 'none',
+                    }}
+                  />
+                  {editingPricesValues.length > 1 && (
+                    <button
+                      onClick={() => setEditingPricesValues(prev => prev.filter((_, j) => j !== pi))}
+                      style={{
+                        padding: '2px 6px', borderRadius: 5, border: '1px solid var(--border2)',
+                        background: 'transparent', color: 'var(--ink3)', fontSize: 11,
+                        cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif",
+                      }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button
+                  onClick={() => setEditingPricesValues(prev => [...prev, { price: '0', deposit: '0' }])}
+                  style={{
+                    padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border2)',
+                    background: 'transparent', color: 'var(--accent)', fontSize: 11,
+                    fontWeight: 700, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif",
+                  }}
+                >
+                  + Price
+                </button>
+                <button
+                  onClick={() => saveEditedPrices(item.id)}
+                  style={{
+                    padding: '5px 9px', borderRadius: 6, border: 'none',
+                    background: 'var(--accent)', color: '#fff', fontSize: 12,
+                    fontWeight: 700, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif",
+                  }}
+                >
+                  ✓
+                </button>
+                <button
+                  onClick={cancelEditPrices}
+                  style={{
+                    padding: '5px 9px', borderRadius: 6, border: '1px solid var(--border2)',
+                    background: 'transparent', color: 'var(--ink3)', fontSize: 11,
+                    cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif",
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           ) : (
             <div
@@ -189,13 +251,15 @@ export const ItemMasterPage = () => {
                   fontFamily: "'JetBrains Mono',monospace",
                   fontWeight: 700,
                   fontSize: 14,
-                  color: item.price > 0 ? 'var(--ink)' : 'var(--ink3)',
+                  color: primaryPrice > 0 ? 'var(--ink)' : 'var(--ink3)',
                 }}
               >
-                {item.price > 0 ? `₹${item.price.toLocaleString()}` : 'Free'}
+                {item.prices.length > 0
+                  ? item.prices.map(p => `₹${p.price.toLocaleString()}`).join(', ')
+                  : 'Free'}
               </span>
               <button
-                onClick={() => startEditPrice(item.id, item.price)}
+                onClick={() => startEditPrices(item.id, item.prices)}
                 style={{
                   fontSize: 11,
                   fontWeight: 700,
@@ -213,17 +277,17 @@ export const ItemMasterPage = () => {
           )}
         </td>
         <td style={{ padding: '14px 18px', textAlign: 'right' }}>
-          {item.itemType === 'linked' ? (
+          {item.itemType === 'linked' && item.bundleComponents.length > 0 ? (
             <>
               <span
                 style={{
                   fontFamily: "'JetBrains Mono',monospace",
                   fontWeight: 800,
                   fontSize: 15,
-                  color: (stock[item.stockSourceId!]?.qty ?? 0) > 0 ? 'var(--ink)' : 'var(--red)',
+                  color: (stock[item.bundleComponents[0].componentItemId]?.qty ?? 0) > 0 ? 'var(--ink)' : 'var(--red)',
                 }}
               >
-                {stock[item.stockSourceId!]?.qty ?? 0}
+                {stock[item.bundleComponents[0].componentItemId]?.qty ?? 0}
               </span>
               <span style={{ fontSize: 11, color: 'var(--ink3)', marginLeft: 4 }}>
                 {srcItem?.unit ?? item.unit}
@@ -492,8 +556,9 @@ export const ItemMasterPage = () => {
           <div className='erp-grid-3'>
             {cylItems.map(item => {
               const qty = stock[item.id]?.qty ?? 0;
-              const val = qty * item.price;
-              const isEditing = editId === item.id;
+              const cylPrimaryPrice = item.prices[0]?.price ?? 0;
+              const val = qty * cylPrimaryPrice;
+              const isEditing = editingPricesId === item.id;
               return (
                 <div
                   key={item.id}
@@ -613,62 +678,97 @@ export const ItemMasterPage = () => {
                         Sale Price
                       </div>
                       {isEditing ? (
-                        <div
-                          style={{
-                            display: 'flex',
-                            gap: 6,
-                            alignItems: 'center',
-                          }}
-                        >
-                          <input
-                            type='number'
-                            value={editPrice}
-                            onChange={e => setEditPrice(e.target.value)}
-                            autoFocus
-                            style={{
-                              width: 90,
-                              background: 'var(--bg)',
-                              border: '2px solid var(--accent)',
-                              borderRadius: 7,
-                              padding: '5px 8px',
-                              fontSize: 14,
-                              fontWeight: 700,
-                              fontFamily: "'JetBrains Mono',monospace",
-                              outline: 'none',
-                              color: 'var(--ink)',
-                            }}
-                          />
-                          <button
-                            onClick={() => savePrice()}
-                            style={{
-                              padding: '5px 10px',
-                              borderRadius: 7,
-                              border: 'none',
-                              background: 'var(--accent)',
-                              color: '#fff',
-                              fontSize: 12,
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              fontFamily: "'Plus Jakarta Sans',sans-serif",
-                            }}
-                          >
-                            ✓
-                          </button>
-                          <button
-                            onClick={cancelEditPrice}
-                            style={{
-                              padding: '5px 10px',
-                              borderRadius: 7,
-                              border: '1px solid var(--border2)',
-                              background: 'transparent',
-                              color: 'var(--ink3)',
-                              fontSize: 12,
-                              cursor: 'pointer',
-                              fontFamily: "'Plus Jakarta Sans',sans-serif",
-                            }}
-                          >
-                            ✕
-                          </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {editingPricesValues.map((pv, pi) => (
+                            <div key={pi} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                              <input
+                                type='number'
+                                value={pv.price}
+                                onChange={e => {
+                                  const next = [...editingPricesValues];
+                                  next[pi] = { ...next[pi], price: e.target.value };
+                                  setEditingPricesValues(next);
+                                }}
+                                autoFocus={pi === 0}
+                                style={{
+                                  width: 90,
+                                  background: 'var(--bg)',
+                                  border: '2px solid var(--accent)',
+                                  borderRadius: 7,
+                                  padding: '5px 8px',
+                                  fontSize: 14,
+                                  fontWeight: 700,
+                                  fontFamily: "'JetBrains Mono',monospace",
+                                  outline: 'none',
+                                  color: 'var(--ink)',
+                                }}
+                              />
+                              <input
+                                type='number'
+                                placeholder='Deposit'
+                                value={pv.deposit}
+                                onChange={e => {
+                                  const next = [...editingPricesValues];
+                                  next[pi] = { ...next[pi], deposit: e.target.value };
+                                  setEditingPricesValues(next);
+                                }}
+                                style={{
+                                  width: 80, padding: '6px 10px', background: 'var(--bg)',
+                                  border: '1px solid var(--border2)', borderRadius: 6,
+                                  fontSize: 13, fontFamily: "'JetBrains Mono',monospace",
+                                  fontWeight: 600, color: 'var(--amber)', outline: 'none',
+                                }}
+                              />
+                              {editingPricesValues.length > 1 && (
+                                <button
+                                  onClick={() => setEditingPricesValues(prev => prev.filter((_, j) => j !== pi))}
+                                  style={{
+                                    padding: '2px 6px', borderRadius: 5,
+                                    border: '1px solid var(--border2)', background: 'transparent',
+                                    color: 'var(--ink3)', fontSize: 11, cursor: 'pointer',
+                                    fontFamily: "'Plus Jakarta Sans',sans-serif",
+                                  }}
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                          <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
+                            <button
+                              onClick={() => setEditingPricesValues(prev => [...prev, { price: '0', deposit: '0' }])}
+                              style={{
+                                padding: '4px 8px', borderRadius: 6,
+                                border: '1px solid var(--border2)', background: 'transparent',
+                                color: 'var(--accent)', fontSize: 11, fontWeight: 700,
+                                cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif",
+                              }}
+                            >
+                              + Price
+                            </button>
+                            <button
+                              onClick={() => saveEditedPrices(item.id)}
+                              style={{
+                                padding: '5px 10px', borderRadius: 7, border: 'none',
+                                background: 'var(--accent)', color: '#fff', fontSize: 12,
+                                fontWeight: 700, cursor: 'pointer',
+                                fontFamily: "'Plus Jakarta Sans',sans-serif",
+                              }}
+                            >
+                              ✓
+                            </button>
+                            <button
+                              onClick={cancelEditPrices}
+                              style={{
+                                padding: '5px 10px', borderRadius: 7,
+                                border: '1px solid var(--border2)', background: 'transparent',
+                                color: 'var(--ink3)', fontSize: 12, cursor: 'pointer',
+                                fontFamily: "'Plus Jakarta Sans',sans-serif",
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <div
@@ -686,10 +786,12 @@ export const ItemMasterPage = () => {
                               fontFamily: "'JetBrains Mono',monospace",
                             }}
                           >
-                            ₹{item.price.toLocaleString()}
+                            {item.prices.length > 0
+                              ? item.prices.map(p => `₹${p.price.toLocaleString()}`).join(', ')
+                              : '₹0'}
                           </span>
                           <button
-                            onClick={() => startEditPrice(item.id, item.price)}
+                            onClick={() => startEditPrices(item.id, item.prices)}
                             style={{
                               fontSize: 11,
                               fontWeight: 700,
@@ -864,7 +966,7 @@ export const ItemMasterPage = () => {
                       {tableItems
                         .filter(i => i.active && i.itemType !== 'linked')
                         .reduce(
-                          (s, it) => s + (stock[it.id]?.qty ?? 0) * it.price,
+                          (s, it) => s + (stock[it.id]?.qty ?? 0) * (it.prices[0]?.price ?? 0),
                           0
                         )
                         .toLocaleString()}
@@ -887,21 +989,98 @@ export const ItemMasterPage = () => {
             required
             placeholder='e.g. Pressure Regulator'
           />
-          <Row>
-            <Field
-              label='Unit'
-              value={form.unit}
-              onChange={v => setField('unit', v)}
-              opts={['Piece', 'Kg', 'Mtr', 'Set', 'Pair', 'Box']}
-            />
-            <Field
-              label='Price (₹)'
-              type='number'
-              value={form.price}
-              onChange={v => setField('price', v)}
-              placeholder='0'
-            />
-          </Row>
+          <Field
+            label='Unit'
+            value={form.unit}
+            onChange={v => setField('unit', v)}
+            opts={['Piece', 'Kg', 'Mtr', 'Set', 'Pair', 'Box']}
+          />
+
+          {/* Multi-price inputs */}
+          <div style={{ marginBottom: 4 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+              <div style={{
+                flex: 1,
+                fontSize: 11, fontWeight: 800, color: 'var(--ink3)',
+                textTransform: 'uppercase', letterSpacing: '.07em',
+              }}>
+                Prices (₹) <span style={{ color: 'var(--red)' }}>*</span>
+              </div>
+              <div style={{
+                width: 90,
+                fontSize: 11, fontWeight: 800, color: 'var(--amber)',
+                textTransform: 'uppercase', letterSpacing: '.07em',
+              }}>
+                Deposit
+              </div>
+            </div>
+            {form.prices.map((pv, pi) => (
+              <div key={pi} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+                <input
+                  type='number'
+                  value={pv.price}
+                  onChange={e => {
+                    const next = [...form.prices];
+                    next[pi] = { ...next[pi], price: e.target.value };
+                    setField('prices', next);
+                  }}
+                  placeholder='0'
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    border: '1.5px solid var(--border2)',
+                    background: 'var(--canvas)',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    fontFamily: "'JetBrains Mono',monospace",
+                    outline: 'none',
+                    color: 'var(--ink)',
+                  }}
+                />
+                <input
+                  type='number'
+                  placeholder='Deposit'
+                  value={pv.deposit}
+                  onChange={e => {
+                    const next = [...form.prices];
+                    next[pi] = { ...next[pi], deposit: e.target.value };
+                    setField('prices', next);
+                  }}
+                  style={{
+                    width: 80, padding: '6px 10px', background: 'var(--bg)',
+                    border: '1px solid var(--border2)', borderRadius: 6,
+                    fontSize: 13, fontFamily: "'JetBrains Mono',monospace",
+                    fontWeight: 600, color: 'var(--amber)', outline: 'none',
+                  }}
+                />
+                {form.prices.length > 1 && (
+                  <button
+                    onClick={() => setField('prices', form.prices.filter((_, j) => j !== pi))}
+                    style={{
+                      padding: '5px 10px', borderRadius: 7,
+                      border: '1px solid var(--border2)', background: 'transparent',
+                      color: 'var(--ink3)', fontSize: 13, cursor: 'pointer',
+                      fontFamily: "'Plus Jakarta Sans',sans-serif",
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              onClick={() => setField('prices', [...form.prices, { price: '', deposit: '0' }])}
+              style={{
+                padding: '5px 12px', borderRadius: 7,
+                border: '1px solid var(--border2)', background: 'transparent',
+                color: 'var(--accent)', fontSize: 12, fontWeight: 700,
+                cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif",
+              }}
+            >
+              + Add Price
+            </button>
+          </div>
 
           {/* Item Type selector */}
           <Field
@@ -915,52 +1094,21 @@ export const ItemMasterPage = () => {
             ]}
           />
 
-          {/* Stock Source — only shown for linked items */}
+          {/* Info for linked items — stock source configured after creation */}
           {form.itemType === 'linked' && (
-            <div>
-              {allCylinderItems.length > 0 ? (
-                <Field
-                  label='Stock Source (which item loses stock when billed)'
-                  value={form.stockSourceId}
-                  onChange={v => setField('stockSourceId', v)}
-                  required
-                  opts={[
-                    { v: '', l: '— select a source —' },
-                    ...allCylinderItems.map(c => ({ v: c.id, l: c.name })),
-                  ]}
-                />
-              ) : (
-                <div
-                  style={{
-                    background: 'var(--redbg)',
-                    border: '1px solid var(--redbd)',
-                    borderRadius: 8,
-                    padding: '10px 14px',
-                    fontSize: 13,
-                    color: 'var(--red)',
-                    fontWeight: 600,
-                  }}
-                >
-                  ⚠️ No cylinder items exist yet. Add a Cylinder item first, then
-                  create linked items that draw from it.
-                </div>
-              )}
-              <div
-                style={{
-                  background: 'var(--purplebg, #f5f0ff)',
-                  border: '1px solid var(--purplebd, #c4b5fd)',
-                  borderRadius: 8,
-                  padding: '10px 14px',
-                  fontSize: 12,
-                  color: 'var(--purple)',
-                  fontWeight: 600,
-                  marginTop: 8,
-                }}
-              >
-                💡 When this item is billed, stock is deducted from the selected
-                source item — not from this item's own stock. This item will only
-                appear in billing when the source item has stock.
-              </div>
+            <div
+              style={{
+                background: 'var(--purplebg, #f5f0ff)',
+                border: '1px solid var(--purplebd, #c4b5fd)',
+                borderRadius: 8,
+                padding: '10px 14px',
+                fontSize: 12,
+                color: 'var(--purple)',
+                fontWeight: 600,
+              }}
+            >
+              After creating this item, use the "Link" button to configure which
+              stock source it draws from when billed.
             </div>
           )}
 

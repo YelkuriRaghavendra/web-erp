@@ -6,7 +6,7 @@ import { syncBill, syncBillUpdate, syncCustomer, syncStock } from '../../core/su
 import { ym } from '../../core/constants';
 import type { Bill, BillLine } from '../../core/types';
 
-type QtysMap = Record<string, { qty: string; rate: string }>;
+type QtysMap = Record<string, { qty: string }>;
 
 export const useBilling = () => {
   const { items, stock, customers, bills, setBills, setStock, setCustomers } =
@@ -50,10 +50,12 @@ export const useBilling = () => {
   const activeItems = useMemo(() => {
     return items.filter(i => {
       if (!i.active) return false;
+      if (i.prices.length === 0) return false;
       if (i.itemType === 'linked') {
-        // Draw stock from the source item
-        const srcQty = i.stockSourceId ? (stock[i.stockSourceId]?.qty ?? 0) : 0;
-        return srcQty > 0;
+        if (i.bundleComponents.length === 0) return false;
+        return i.bundleComponents.every(
+          c => (stock[c.componentItemId]?.qty ?? 0) >= c.qty
+        );
       }
       return (stock[i.id]?.qty ?? 0) > 0;
     });
@@ -63,7 +65,9 @@ export const useBilling = () => {
   const makeEmptyQtys = useCallback((): QtysMap => {
     const q: QtysMap = {};
     activeItems.forEach(i => {
-      q[i.id] = { qty: '', rate: String(i.price) };
+      i.prices.forEach(p => {
+        q[`${i.id}-${p.id}`] = { qty: '' };
+      });
     });
     return q;
   }, [activeItems]);
@@ -89,23 +93,26 @@ export const useBilling = () => {
 
   // ── Per-cell setter ───────────────────────────────────────
   const setQtyField = useCallback(
-    (id: string, k: 'qty' | 'rate', v: string) =>
-      setQtys(p => ({ ...p, [id]: { ...p[id], [k]: v } })),
+    (key: string, v: string) =>
+      setQtys(p => ({ ...p, [key]: { qty: v } })),
     []
   );
 
   // ── Derived bill lines and total ─────────────────────────
   const lines = useMemo(
     (): BillLine[] =>
-      activeItems
-        .filter(i => +(qtys[i.id]?.qty || 0) > 0)
-        .map(i => ({
-          itemId: i.id,
-          itemName: i.name,
-          qty: +qtys[i.id].qty,
-          price: +(qtys[i.id].rate ?? i.price),
-          amount: +qtys[i.id].qty * +(qtys[i.id].rate ?? i.price),
-        })),
+      activeItems.flatMap(i =>
+        i.prices
+          .filter(p => +(qtys[`${i.id}-${p.id}`]?.qty || 0) > 0)
+          .map(p => ({
+            itemId: i.id,
+            itemName: i.name,
+            qty: +(qtys[`${i.id}-${p.id}`].qty),
+            price: p.price,
+            deposit: p.deposit ?? 0,
+            amount: +(qtys[`${i.id}-${p.id}`].qty) * p.price,
+          }))
+      ),
     [qtys, activeItems]
   );
 
@@ -141,6 +148,14 @@ export const useBilling = () => {
       credit: monthBills
         .filter(b => b.payment === 'Credit')
         .reduce((s, b) => s + b.total, 0),
+      totalDeposits: monthBills.reduce(
+        (s, b) => s + b.lines.reduce((ls, l) => ls + l.qty * l.deposit, 0),
+        0
+      ),
+      netRevenue: monthBills.reduce(
+        (s, b) => s + b.total - b.lines.reduce((ls, l) => ls + l.qty * l.deposit, 0),
+        0
+      ),
     }),
     [monthBills]
   );
@@ -162,45 +177,41 @@ export const useBilling = () => {
     }
 
     // ── Stock validation — fully data-driven ─────────────────
-    // 1. Group 'linked' item lines by their stockSourceId to check
-    //    whether the source item has enough stock.
-    const linkedDeductions: Record<string, number> = {};
+    // 1. Aggregate qty per item across all price rows
+    const qtyPerItem: Record<string, number> = {};
     lines.forEach(l => {
-      const item = items.find(i => i.id === l.itemId);
-      if (item?.itemType === 'linked' && item.stockSourceId) {
-        linkedDeductions[item.stockSourceId] =
-          (linkedDeductions[item.stockSourceId] ?? 0) + l.qty;
-      }
+      qtyPerItem[l.itemId] = (qtyPerItem[l.itemId] ?? 0) + l.qty;
     });
 
-    for (const [srcId, neededQty] of Object.entries(linkedDeductions)) {
-      const srcItem = items.find(i => i.id === srcId);
-      const available = stock[srcId]?.qty ?? 0;
-      // Also count any direct lines for the source item in this same bill
-      const directQty = lines
-        .filter(l => l.itemId === srcId)
-        .reduce((s, l) => s + l.qty, 0);
-      if (neededQty + directQty > available) {
-        showToast(
-          `Not enough ${srcItem?.name ?? 'source'} stock — need ${neededQty + directQty}, have ${available}`,
-          'error'
-        );
-        return;
+    // 2. Validate linked items — check all bundle components have enough stock
+    for (const [itemId, totalQty] of Object.entries(qtyPerItem)) {
+      const item = items.find(i => i.id === itemId);
+      if (item?.itemType !== 'linked') continue;
+      for (const comp of item.bundleComponents) {
+        const needed = totalQty * comp.qty;
+        const available = stock[comp.componentItemId]?.qty ?? 0;
+        const directQty = qtyPerItem[comp.componentItemId] ?? 0;
+        if (needed + directQty > available) {
+          showToast(
+            `Not enough ${comp.componentItemName} stock (need ${needed + directQty}, have ${available})`,
+            'error'
+          );
+          return;
+        }
       }
     }
 
-    // 2. Validate own-stock items (regular + cylinder)
-    const overstock = lines.filter(l => {
-      const item = items.find(i => i.id === l.itemId);
+    // 3. Validate own-stock items (regular + cylinder)
+    const overstock = Object.entries(qtyPerItem).filter(([itemId, totalQty]) => {
+      const item = items.find(i => i.id === itemId);
       if (!item || item.itemType === 'linked') return false;
-      return l.qty > (stock[l.itemId]?.qty ?? 0);
+      return totalQty > (stock[itemId]?.qty ?? 0);
     });
     if (overstock.length) {
-      const first = overstock[0];
-      showToast(
-        `Not enough stock — ${first.itemName}: only ${stock[first.itemId]?.qty ?? 0} available, entered ${first.qty}`,
-        'error'
-      );
+      const names = overstock
+        .map(([id]) => items.find(i => i.id === id)?.name ?? id)
+        .join(', ');
+      showToast(`Insufficient stock for: ${names}`, 'error');
       return;
     }
 
@@ -222,22 +233,29 @@ export const useBilling = () => {
     setBills(p => [bill, ...p]);
     syncBill(bill); // ← background sync to Supabase
 
-    // ── Stock deduction — data-driven ─────────────────────────
-    // 'linked' items deduct from their stockSourceId.
-    // All other items deduct from their own stock.
     setStock(p => {
       const updated = { ...p };
+      const qtyPerItem2: Record<string, number> = {};
       lines.forEach(l => {
-        const item = items.find(i => i.id === l.itemId);
-        const deductFrom =
-          item?.itemType === 'linked' && item.stockSourceId
-            ? item.stockSourceId
-            : l.itemId;
-        updated[deductFrom] = {
-          qty: Math.max(0, (updated[deductFrom]?.qty ?? 0) - l.qty),
-        };
+        qtyPerItem2[l.itemId] = (qtyPerItem2[l.itemId] ?? 0) + l.qty;
       });
-      syncStock(updated); // ← persist updated stock to Supabase
+
+      for (const [itemId, totalQty] of Object.entries(qtyPerItem2)) {
+        const item = items.find(i => i.id === itemId);
+        if (item?.itemType === 'linked') {
+          item.bundleComponents.forEach(comp => {
+            const deductQty = totalQty * comp.qty;
+            updated[comp.componentItemId] = {
+              qty: Math.max(0, (updated[comp.componentItemId]?.qty ?? 0) - deductQty),
+            };
+          });
+        } else {
+          updated[itemId] = {
+            qty: Math.max(0, (updated[itemId]?.qty ?? 0) - totalQty),
+          };
+        }
+      }
+      syncStock(updated);
       return updated;
     });
 
@@ -298,29 +316,47 @@ export const useBilling = () => {
 
   // ── Update an existing bill (admin only) ─────────────────
   const updateBill = useCallback((oldBill: Bill, newBill: Bill) => {
-    // 1. Replace bill in store
     setBills(prev => prev.map(b => b.id === newBill.id ? newBill : b));
 
-    // 2. Adjust stock: restore old deductions, apply new ones
     setStock(prevStock => {
       const s = { ...prevStock };
+
+      const aggregateQty = (billLines: BillLine[]): Record<string, number> => {
+        const map: Record<string, number> = {};
+        billLines.forEach(l => { map[l.itemId] = (map[l.itemId] ?? 0) + l.qty; });
+        return map;
+      };
+
       // Restore stock from old bill
-      oldBill.lines.forEach(l => {
-        const item = items.find(i => i.id === l.itemId);
-        const src = item?.itemType === 'linked' && item.stockSourceId ? item.stockSourceId : l.itemId;
-        s[src] = { qty: (s[src]?.qty ?? 0) + l.qty };
-      });
+      const oldQtyMap = aggregateQty(oldBill.lines);
+      for (const [itemId, qty] of Object.entries(oldQtyMap)) {
+        const item = items.find(i => i.id === itemId);
+        if (item?.itemType === 'linked') {
+          item.bundleComponents.forEach(comp => {
+            s[comp.componentItemId] = { qty: (s[comp.componentItemId]?.qty ?? 0) + qty * comp.qty };
+          });
+        } else {
+          s[itemId] = { qty: (s[itemId]?.qty ?? 0) + qty };
+        }
+      }
+
       // Deduct stock for new bill
-      newBill.lines.forEach(l => {
-        const item = items.find(i => i.id === l.itemId);
-        const src = item?.itemType === 'linked' && item.stockSourceId ? item.stockSourceId : l.itemId;
-        s[src] = { qty: Math.max(0, (s[src]?.qty ?? 0) - l.qty) };
-      });
+      const newQtyMap = aggregateQty(newBill.lines);
+      for (const [itemId, qty] of Object.entries(newQtyMap)) {
+        const item = items.find(i => i.id === itemId);
+        if (item?.itemType === 'linked') {
+          item.bundleComponents.forEach(comp => {
+            s[comp.componentItemId] = { qty: Math.max(0, (s[comp.componentItemId]?.qty ?? 0) - qty * comp.qty) };
+          });
+        } else {
+          s[itemId] = { qty: Math.max(0, (s[itemId]?.qty ?? 0) - qty) };
+        }
+      }
+
       syncStock(s);
       return s;
     });
 
-    // 3. Sync to Supabase
     syncBillUpdate(newBill);
     showToast(`✓ Bill ${newBill.id} updated`, 'success');
   }, [items, setBills, setStock, showToast]);

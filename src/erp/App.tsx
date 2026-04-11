@@ -17,7 +17,9 @@ import {
   fetchPurchases,
   fetchTransactions,
   fetchOpeningBalances,
+  fetchDepositSettlements,
   setCurrentUser,
+  runMigrations,
 } from './core/supabase';
 import type { ERPUser, Role } from './core/types';
 
@@ -182,6 +184,7 @@ const GasERPInner = () => {
     setPurchases,
     setTransactions,
     setOpeningBalances,
+    setDepositSettlements,
   } = useERPStore(
     useShallow(s => ({
       setStaff: s.setStaff,
@@ -192,6 +195,7 @@ const GasERPInner = () => {
       setPurchases: s.setPurchases,
       setTransactions: s.setTransactions,
       setOpeningBalances: s.setOpeningBalances,
+      setDepositSettlements: s.setDepositSettlements,
     }))
   );
 
@@ -243,6 +247,9 @@ const GasERPInner = () => {
         createdAt: currentUser.createdAt,
       }]);
 
+      setBootStatus('Running migrations…');
+      await runMigrations();
+
       setBootStatus('Loading items & stock…');
       const [items, stock] = await Promise.all([fetchAllItems(), fetchStock()]);
       if (items.length) setItems(items);
@@ -268,6 +275,9 @@ const GasERPInner = () => {
       if (transactions.length) setTransactions(transactions);
       if (Object.keys(openingBalances).length)
         setOpeningBalances(openingBalances);
+
+      const settlements = await fetchDepositSettlements();
+      if (settlements.length) setDepositSettlements(settlements);
     } catch (err) {
       console.error('[Bootstrap] failed:', err);
     } finally {
@@ -282,6 +292,7 @@ const GasERPInner = () => {
     setPurchases,
     setTransactions,
     setOpeningBalances,
+    setDepositSettlements,
   ]);
 
   // If a session was already present on mount, bootstrap immediately.

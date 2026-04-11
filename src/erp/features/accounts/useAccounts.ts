@@ -51,9 +51,17 @@ export const TXN_TYPES = [
     id: 'ADD_TO_CASH' as TxnType,
     label: 'Add Cash in Hand',
     icon: '💰',
-    cashEffect: +1,
+    cashEffect: 1,
     bankEffect: 0,
     color: 'green',
+  },
+  {
+    id: 'DEPOSIT_SETTLEMENT' as TxnType,
+    label: 'Deposit Settlement',
+    icon: '🏢',
+    cashEffect: 0,
+    bankEffect: -1,
+    color: 'amber',
   },
 ] as const;
 
@@ -151,6 +159,9 @@ export const useAccounts = () => {
     const mAddToCash = mTxns
       .filter(t => t.type === 'ADD_TO_CASH')
       .reduce((s, t) => s + t.amount, 0);
+    const mDepositSettled = mTxns
+      .filter(t => t.type === 'DEPOSIT_SETTLEMENT')
+      .reduce((s, t) => s + t.amount, 0);
 
     // Today
     const todayBills = bills.filter(b => b.date === today);
@@ -174,7 +185,7 @@ export const useAccounts = () => {
 
     return {
       currentCash: ob.cash + mCashSales + mBankToCash + mAddToCash - mCashToBank - mExpCash,
-      currentBank: ob.bank + mUpiSales + mCashToBank + mAddToBank - mBankToCash - mExpBank,
+      currentBank: ob.bank + mUpiSales + mCashToBank + mAddToBank - mBankToCash - mExpBank - mDepositSettled,
       todayCash,
       todayUPI,
       todayDeposits,

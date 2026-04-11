@@ -41,15 +41,31 @@ export interface StaffUser extends ERPUser {
 //              NEVER shown in the purchase form
 export type ItemType = 'regular' | 'cylinder' | 'linked';
 
+// ── Item Prices ────────────────────────────────────────────
+export interface ItemPrice {
+  id: string;        // bigserial as string
+  price: number;
+  deposit: number;   // deposit portion of this price (goes to company)
+  sortOrder: number;
+}
+
+// ── Bundle Components (for linked items) ───────────────────
+export interface BundleComponent {
+  id: string;              // bigserial as string
+  componentItemId: string; // bigserial as string
+  componentItemName: string; // denormalized for display
+  qty: number;
+}
+
 // ── Item Master ──────────────────────────────────────────────
 export interface Item {
   id: string;           // bigserial as string (maps to item_id in DB)
   name: string;
   unit: string;
-  price: number;
+  prices: ItemPrice[];           // replaces single `price`
   active: boolean;
-  itemType: ItemType;          // maps to item_type in DB
-  stockSourceId: string | null; // maps to stock_source_id; set only for 'linked' items
+  itemType: ItemType;
+  bundleComponents: BundleComponent[]; // replaces `stockSourceId`
   // audit
   createdAt?: number;
   updatedAt?: number;
@@ -95,6 +111,7 @@ export interface BillLine {
   qty: number;
   price: number;
   amount: number;
+  deposit: number; // deposit per unit, snapshotted from ItemPrice at bill time
 }
 
 export interface Bill {
@@ -126,6 +143,8 @@ export interface Purchase {
   id: string; // "PO-YYMMDD-NNN" (maps to purchase_id in DB — text column)
   date: string;
   note: string;
+  vehicleNo: string;
+  salesOrderRef: string;
   grandTotal: number;
   lines: PurchaseLine[];
   // audit
@@ -142,7 +161,8 @@ export type TxnType =
   | 'EXPENSE_CASH'
   | 'EXPENSE_BANK'
   | 'ADD_TO_BANK'
-  | 'ADD_TO_CASH';
+  | 'ADD_TO_CASH'
+  | 'DEPOSIT_SETTLEMENT';
 
 export interface Transaction {
   id: string; // bigserial as string (maps to transaction_id in DB)
@@ -155,6 +175,16 @@ export interface Transaction {
   updatedAt?: number;
   createdBy?: string;
   updatedBy?: string;
+}
+
+// ── Deposit Settlements ──────────────────────────────────────
+export interface DepositSettlement {
+  id: string;
+  date: string;
+  amount: number;
+  note: string;
+  createdAt?: number;
+  createdBy?: string;
 }
 
 // ── Opening Balances ─────────────────────────────────────────

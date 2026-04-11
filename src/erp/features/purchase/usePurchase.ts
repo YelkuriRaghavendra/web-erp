@@ -60,6 +60,8 @@ export const usePurchase = () => {
     });
   }, [thisMonth]);
   const [note, setNote] = useState('');
+  const [vehicleNo, setVehicleNo] = useState('');
+  const [salesOrderRef, setSalesOrderRef] = useState('');
   const [rows, setRows] = useState<RowsMap>(makeEmptyRows);
 
   // ── Per-cell setter ───────────────────────────────────────
@@ -110,6 +112,8 @@ export const usePurchase = () => {
   const resetForm = useCallback(() => {
     setDate(new Date().toISOString().slice(0, 10));
     setNote('');
+    setVehicleNo('');
+    setSalesOrderRef('');
     setRows(makeEmptyRows());
   }, [makeEmptyRows]);
 
@@ -124,7 +128,7 @@ export const usePurchase = () => {
     const dateStr = date.replace(/-/g, '').slice(2); // "YYMMDD"
     const dayCount = purchases.filter(p => p.date === date).length + 1;
     const id = `PO-${dateStr}-${String(dayCount).padStart(3, '0')}`;
-    const po: Purchase = { id, date, note, grandTotal, lines };
+    const po: Purchase = { id, date, note, vehicleNo, salesOrderRef, grandTotal, lines };
 
     setPurchases(p => [po, ...p]);
     syncPurchase(po); // ← background sync to Supabase
@@ -145,6 +149,8 @@ export const usePurchase = () => {
     stock,
     date,
     note,
+    vehicleNo,
+    salesOrderRef,
     grandTotal,
     setPurchases,
     setStock,
@@ -185,6 +191,10 @@ export const usePurchase = () => {
     setDate,
     note,
     setNote,
+    vehicleNo,
+    setVehicleNo,
+    salesOrderRef,
+    setSalesOrderRef,
     rows,
     setRowField,
     activeItems,
