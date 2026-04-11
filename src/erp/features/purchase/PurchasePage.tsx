@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { StatCard } from '../../shared/components/ui';
 import { usePurchase } from './usePurchase';
 import { monthLabel, ym } from '../../core/constants';
 import type { Purchase, PurchaseLine } from '../../core/types';
