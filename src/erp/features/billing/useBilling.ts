@@ -2,7 +2,8 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useERPStore } from '../../core/store';
 import { useToast } from '../../shared/hooks/useToast';
-import { syncBill, syncCustomer, syncStock } from '../../core/supabase';
+import { syncBill, syncBillUpdate, syncCustomer, syncStock } from '../../core/supabase';
+import { ym } from '../../core/constants';
 import type { Bill, BillLine } from '../../core/types';
 
 type QtysMap = Record<string, { qty: string; rate: string }>;
@@ -23,6 +24,25 @@ export const useBilling = () => {
   const showToast = useToast();
 
   const today = new Date().toISOString().slice(0, 10);
+  const thisMonth = today.slice(0, 7);
+  const [selectedMonth, setSelectedMonth] = useState(thisMonth);
+
+  const prevMonth = useCallback(() => {
+    setSelectedMonth(prev => {
+      const [y, m] = prev.split('-').map(Number);
+      const d = new Date(y, m - 2, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    });
+  }, []);
+
+  const nextMonth = useCallback(() => {
+    setSelectedMonth(prev => {
+      const [y, m] = prev.split('-').map(Number);
+      const d = new Date(y, m, 1);
+      const next = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      return next <= thisMonth ? next : prev;
+    });
+  }, [thisMonth]);
 
   // Active items for billing (data-driven — no name regex):
   //   'regular' / 'cylinder' → show when their own stock > 0
@@ -104,25 +124,25 @@ export const useBilling = () => {
     [selectedCustomer]
   );
 
-  // ── Today's billing summary ───────────────────────────────
-  const todayBills = useMemo(
-    () => bills.filter(b => b.date === today),
-    [bills, today]
+  // ── Selected month billing summary ────────────────────────
+  const monthBills = useMemo(
+    () => bills.filter(b => ym(b.date) === selectedMonth),
+    [bills, selectedMonth]
   );
-  const todaySummary = useMemo(
+  const monthSummary = useMemo(
     () => ({
-      count: todayBills.length,
-      cash: todayBills
+      count: monthBills.length,
+      cash: monthBills
         .filter(b => b.payment === 'Cash')
         .reduce((s, b) => s + b.total, 0),
-      upi: todayBills
+      upi: monthBills
         .filter(b => b.payment === 'UPI')
         .reduce((s, b) => s + b.total, 0),
-      credit: todayBills
+      credit: monthBills
         .filter(b => b.payment === 'Credit')
         .reduce((s, b) => s + b.total, 0),
     }),
-    [todayBills]
+    [monthBills]
   );
 
   // ── Reset form ────────────────────────────────────────────
@@ -276,6 +296,35 @@ export const useBilling = () => {
     showToast,
   ]);
 
+  // ── Update an existing bill (admin only) ─────────────────
+  const updateBill = useCallback((oldBill: Bill, newBill: Bill) => {
+    // 1. Replace bill in store
+    setBills(prev => prev.map(b => b.id === newBill.id ? newBill : b));
+
+    // 2. Adjust stock: restore old deductions, apply new ones
+    setStock(prevStock => {
+      const s = { ...prevStock };
+      // Restore stock from old bill
+      oldBill.lines.forEach(l => {
+        const item = items.find(i => i.id === l.itemId);
+        const src = item?.itemType === 'linked' && item.stockSourceId ? item.stockSourceId : l.itemId;
+        s[src] = { qty: (s[src]?.qty ?? 0) + l.qty };
+      });
+      // Deduct stock for new bill
+      newBill.lines.forEach(l => {
+        const item = items.find(i => i.id === l.itemId);
+        const src = item?.itemType === 'linked' && item.stockSourceId ? item.stockSourceId : l.itemId;
+        s[src] = { qty: Math.max(0, (s[src]?.qty ?? 0) - l.qty) };
+      });
+      syncStock(s);
+      return s;
+    });
+
+    // 3. Sync to Supabase
+    syncBillUpdate(newBill);
+    showToast(`✓ Bill ${newBill.id} updated`, 'success');
+  }, [items, setBills, setStock, showToast]);
+
   return {
     view,
     setView,
@@ -297,8 +346,12 @@ export const useBilling = () => {
     total,
     selectedCustomer,
     payOpts,
-    todaySummary,
+    selectedMonth,
+    prevMonth,
+    nextMonth,
+    monthSummary,
     createBill,
+    updateBill,
     resetForm,
   };
 };

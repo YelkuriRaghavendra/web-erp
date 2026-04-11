@@ -451,6 +451,65 @@ export const syncPurchase = (po: Purchase) => {
   });
 };
 
+// Update an existing bill: upsert header, delete old lines, insert new lines
+export const syncBillUpdate = (bill: Bill) => {
+  void supabase.from('bills').upsert({
+    bill_id: bill.id,
+    date: bill.date,
+    customer_id: bill.customerId,
+    customer_name: bill.customerName,
+    payment: bill.payment,
+    total: bill.total,
+    note: bill.note,
+    updated_by: _currentUser,
+  }).then(({ error }) => {
+    if (error) { console.warn('[Supabase sync] update bill header:', error); return; }
+    void supabase.from('bill_lines').delete().eq('bill_id', bill.id).then(({ error: delErr }) => {
+      if (delErr) { console.warn('[Supabase sync] delete bill_lines:', delErr); return; }
+      bg('insert updated bill_lines', supabase.from('bill_lines').insert(
+        bill.lines.map(l => ({
+          bill_id: bill.id,
+          item_id: Number(l.itemId),
+          item_name: l.itemName,
+          qty: l.qty,
+          price: l.price,
+          amount: l.amount,
+          created_by: _currentUser,
+          updated_by: _currentUser,
+        }))
+      ));
+    });
+  });
+};
+
+// Update an existing purchase: upsert header, delete old lines, insert new lines
+export const syncPurchaseUpdate = (po: Purchase) => {
+  void supabase.from('purchases').upsert({
+    purchase_id: po.id,
+    date: po.date,
+    note: po.note,
+    grand_total: po.grandTotal,
+    updated_by: _currentUser,
+  }).then(({ error }) => {
+    if (error) { console.warn('[Supabase sync] update purchase header:', error); return; }
+    void supabase.from('purchase_lines').delete().eq('purchase_id', po.id).then(({ error: delErr }) => {
+      if (delErr) { console.warn('[Supabase sync] delete purchase_lines:', delErr); return; }
+      bg('insert updated purchase_lines', supabase.from('purchase_lines').insert(
+        po.lines.map(l => ({
+          purchase_id: po.id,
+          item_id: Number(l.itemId),
+          item_name: l.itemName,
+          qty: l.qty,
+          rate: l.rate,
+          total: l.total,
+          created_by: _currentUser,
+          updated_by: _currentUser,
+        }))
+      ));
+    });
+  });
+};
+
 export const syncItems = (items: Item[]) => {
   bg(
     'upsert items',

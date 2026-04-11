@@ -3,7 +3,14 @@ import { createPortal } from 'react-dom';
 import { Badge } from '../../shared/components/ui';
 import { payLabel, payColor } from '../../shared/components/ui';
 import { useBilling } from './useBilling';
-import type { Bill, BillLine } from '../../core/types';
+import { monthLabel, ym } from '../../core/constants';
+import type { Bill, BillLine, Customer } from '../../core/types';
+
+// ── Read role from session ─────────────────────────────────────
+const _getRole = (): string => {
+  try { return (JSON.parse(sessionStorage.getItem('gas-erp-user') ?? '{}') as { role?: string })?.role ?? ''; }
+  catch { return ''; }
+};
 
 const fmtDate = (d: string) =>
   new Date(d + 'T00:00:00').toLocaleDateString('en-IN', {
@@ -380,8 +387,171 @@ const BillDetailModal = ({
   );
 };
 
+// ── Bill edit modal (admin only) ──────────────────────────────
+const BillEditModal = ({
+  bill,
+  customers,
+  onSave,
+  onClose,
+}: {
+  bill: Bill;
+  customers: Customer[];
+  onSave: (updated: Bill) => void;
+  onClose: () => void;
+}) => {
+  const [date, setDate] = useState(bill.date);
+  const [custId, setCustId] = useState(bill.customerId ?? '');
+  const [payment, setPayment] = useState<'Cash' | 'UPI' | 'Credit'>(bill.payment);
+  const [note, setNote] = useState(bill.note);
+  const [editLines, setEditLines] = useState(
+    bill.lines.map(l => ({ ...l, qtyStr: String(l.qty), priceStr: String(l.price) }))
+  );
+
+  const setLineField = (idx: number, field: 'qtyStr' | 'priceStr', val: string) =>
+    setEditLines(prev => prev.map((l, i) => i === idx ? { ...l, [field]: val } : l));
+
+  const removeLine = (idx: number) =>
+    setEditLines(prev => prev.filter((_, i) => i !== idx));
+
+  const newLines: BillLine[] = editLines
+    .map(l => ({
+      itemId: l.itemId,
+      itemName: l.itemName,
+      qty: parseFloat(l.qtyStr) || 0,
+      price: parseFloat(l.priceStr) || 0,
+      amount: (parseFloat(l.qtyStr) || 0) * (parseFloat(l.priceStr) || 0),
+    }))
+    .filter(l => l.qty > 0);
+
+  const newTotal = newLines.reduce((s, l) => s + l.amount, 0);
+  const selectedCust = customers.find(c => c.id === custId) ?? null;
+  const creditInvolved = bill.payment === 'Credit' || payment === 'Credit';
+
+  const inp: React.CSSProperties = {
+    width: '100%', boxSizing: 'border-box', background: 'var(--bg)',
+    border: '1px solid var(--border2)', borderRadius: 8, padding: '8px 12px',
+    fontSize: 13, color: 'var(--ink)', outline: 'none',
+    fontFamily: "'Plus Jakarta Sans',sans-serif",
+  };
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: 'var(--canvas)', borderRadius: 20, width: '100%', maxWidth: 640, maxHeight: '90vh', overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,.30)', display: 'flex', flexDirection: 'column' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ background: 'var(--sidebar)', padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,.4)', textTransform: 'uppercase', letterSpacing: '.12em', marginBottom: 6 }}>✏️ Edit Bill</div>
+            <div style={{ fontSize: 22, fontWeight: 900, fontFamily: "'JetBrains Mono',monospace", color: '#ff9a5c' }}>{bill.id}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,.12)', border: 'none', borderRadius: 10, color: 'rgba(255,255,255,.7)', cursor: 'pointer', fontSize: 18, padding: '6px 13px' }}>✕</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Date + Customer */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 6 }}>Date</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 6 }}>Customer</label>
+              <select value={custId} onChange={e => setCustId(e.target.value)} style={inp}>
+                <option value="">Walk-in</option>
+                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Payment mode */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 8 }}>Payment Mode</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(['Cash', 'UPI', 'Credit'] as const).map(p => (
+                <button
+                  key={p}
+                  onClick={() => setPayment(p)}
+                  style={{ padding: '7px 18px', borderRadius: 8, border: `1.5px solid ${payment === p ? 'var(--accent)' : 'var(--border2)'}`, background: payment === p ? 'var(--accentbg)' : 'var(--canvas)', color: payment === p ? 'var(--accent)' : 'var(--ink3)', fontSize: 13, fontWeight: payment === p ? 700 : 500, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif", transition: 'all .15s' }}
+                >
+                  {p === 'Cash' ? '💵' : p === 'UPI' ? '🏦' : '📋'} {p}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Note */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 6 }}>Note</label>
+            <input type="text" value={note} onChange={e => setNote(e.target.value)} placeholder="Optional note" style={inp} />
+          </div>
+
+          {/* Line items */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 8 }}>Line Items</label>
+            <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 88px 88px 90px 32px', background: 'var(--bg)', padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
+                {['Item', 'Qty', 'Price', 'Amount', ''].map(h => (
+                  <div key={h} style={{ fontSize: 10.5, fontWeight: 800, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.06em', textAlign: h === 'Amount' ? 'right' : 'left' }}>{h}</div>
+                ))}
+              </div>
+              {editLines.map((l, idx) => (
+                <div
+                  key={l.itemId + idx}
+                  style={{ display: 'grid', gridTemplateColumns: '1fr 88px 88px 90px 32px', alignItems: 'center', padding: '8px 12px', borderBottom: idx < editLines.length - 1 ? '1px solid var(--border)' : 'none', gap: 6 }}
+                >
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{l.itemName}</span>
+                  <input type="number" value={l.qtyStr} onChange={e => setLineField(idx, 'qtyStr', e.target.value)} min="0" style={{ ...inp, padding: '5px 8px', fontFamily: "'JetBrains Mono',monospace", textAlign: 'right' as const }} />
+                  <input type="number" value={l.priceStr} onChange={e => setLineField(idx, 'priceStr', e.target.value)} min="0" style={{ ...inp, padding: '5px 8px', fontFamily: "'JetBrains Mono',monospace", textAlign: 'right' as const }} />
+                  <div style={{ textAlign: 'right', fontSize: 13, fontWeight: 700, color: 'var(--ink)', fontFamily: "'JetBrains Mono',monospace" }}>
+                    ₹{((parseFloat(l.qtyStr) || 0) * (parseFloat(l.priceStr) || 0)).toLocaleString()}
+                  </div>
+                  <button onClick={() => removeLine(idx)} title="Remove line" style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 18, padding: 0, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* New total */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+            <span style={{ fontSize: 13, color: 'var(--ink3)', fontWeight: 600 }}>New Total</span>
+            <span style={{ fontSize: 22, fontWeight: 900, color: 'var(--accent)', fontFamily: "'JetBrains Mono',monospace" }}>₹{newTotal.toLocaleString()}</span>
+          </div>
+
+          {/* Credit warning */}
+          {creditInvolved && (
+            <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#c2410c' }}>
+              ⚠️ If payment mode changed from/to Credit, update the customer ledger manually under Customers → Ledger.
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 10, flexShrink: 0 }}>
+          <button onClick={onClose} style={{ padding: '9px 20px', borderRadius: 10, border: '1px solid var(--border2)', background: 'var(--canvas)', color: 'var(--ink2)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Cancel</button>
+          <button
+            onClick={() => {
+              if (!newLines.length) return;
+              onSave({ ...bill, date, customerId: selectedCust?.id ?? null, customerName: selectedCust?.name ?? '', payment, note, lines: newLines, total: newTotal });
+            }}
+            disabled={newLines.length === 0}
+            style={{ padding: '9px 24px', borderRadius: 10, border: 'none', background: newLines.length ? 'var(--accent)' : 'var(--border)', color: newLines.length ? '#fff' : 'var(--ink3)', fontSize: 13, fontWeight: 700, cursor: newLines.length ? 'pointer' : 'not-allowed', fontFamily: "'Plus Jakarta Sans',sans-serif" }}
+          >
+            💾 Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── Bills table with search + sort ───────────────────────────
-type TodaySummary = {
+type MonthSummary = {
   count: number;
   cash: number;
   upi: number;
@@ -390,32 +560,45 @@ type TodaySummary = {
 type SortCol = 'id' | 'date' | 'lines' | 'total' | 'payment';
 type SortDir = 'asc' | 'desc';
 
-const COLS: { key: SortCol | null; label: string; align: 'left' | 'right' }[] =
-  [
-    { key: 'id', label: 'Bill No.', align: 'left' },
-    { key: 'date', label: 'Date', align: 'left' },
-    { key: null, label: 'Customer', align: 'left' },
-    { key: 'lines', label: 'Items', align: 'right' },
-    { key: 'total', label: 'Amount', align: 'right' },
-    { key: 'payment', label: 'Payment', align: 'left' },
-    { key: null, label: '', align: 'left' }, // eye column
-  ];
-
-const GRID = '140px 130px 1fr 110px 130px 130px 48px';
+const BASE_COLS: { key: SortCol | null; label: string; align: 'left' | 'right' }[] = [
+  { key: 'id', label: 'Bill No.', align: 'left' },
+  { key: 'date', label: 'Date', align: 'left' },
+  { key: null, label: 'Customer', align: 'left' },
+  { key: 'lines', label: 'Items', align: 'right' },
+  { key: 'total', label: 'Amount', align: 'right' },
+  { key: 'payment', label: 'Payment', align: 'left' },
+  { key: null, label: '', align: 'left' }, // eye column
+];
 
 const BillsTable = ({
   bills,
-  todaySummary,
+  monthSummary,
+  selectedMonth,
+  isAdmin,
+  customers,
+  onEdit,
 }: {
   bills: Bill[];
-  todaySummary: TodaySummary;
+  monthSummary: MonthSummary;
+  selectedMonth: string;
+  isAdmin: boolean;
+  customers: Customer[];
+  onEdit: (old: Bill, updated: Bill) => void;
 }) => {
+  const COLS = isAdmin
+    ? [...BASE_COLS, { key: null as SortCol | null, label: '', align: 'left' as const }]
+    : BASE_COLS;
+  const GRID = isAdmin
+    ? '140px 130px 1fr 110px 130px 130px 48px 48px'
+    : '140px 130px 1fr 110px 130px 130px 48px';
+
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [sortCol, setSortCol] = useState<SortCol>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
+  const [editingBill, setEditingBill] = useState<Bill | null>(null);
 
   const handleSort = (col: SortCol) => {
     if (sortCol === col) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
@@ -426,6 +609,7 @@ const BillsTable = ({
   };
 
   const filtered = bills
+    .filter(b => ym(b.date) === selectedMonth)
     .filter(b => {
       const q = search.toLowerCase();
       const matchSearch =
@@ -462,7 +646,7 @@ const BillsTable = ({
 
   return (
     <>
-      {/* Bill detail modal — rendered in document.body via portal to avoid stacking context issues */}
+      {/* Bill detail modal */}
       {selectedBill &&
         createPortal(
           <BillDetailModal
@@ -472,14 +656,26 @@ const BillsTable = ({
           document.body
         )}
 
+      {/* Bill edit modal (admin only) */}
+      {editingBill &&
+        createPortal(
+          <BillEditModal
+            bill={editingBill}
+            customers={customers}
+            onSave={updated => { onEdit(editingBill, updated); setEditingBill(null); }}
+            onClose={() => setEditingBill(null)}
+          />,
+          document.body
+        )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* Stat cards */}
         <div className='erp-grid-4'>
           {[
-            { label: "Today's Bills", value: String(todaySummary.count), sub: 'bills raised', color: 'var(--accent)' },
-            { label: 'Cash Collected', value: `₹${todaySummary.cash.toLocaleString()}`, sub: 'received in cash', color: 'var(--green)' },
-            { label: 'UPI Received', value: `₹${todaySummary.upi.toLocaleString()}`, sub: 'to bank account', color: 'var(--blue)' },
-            { label: 'On Credit', value: `₹${todaySummary.credit.toLocaleString()}`, sub: 'pending payment', color: 'var(--red)' },
+            { label: 'Bills Raised', value: String(monthSummary.count), sub: 'this month', color: 'var(--accent)' },
+            { label: 'Cash Collected', value: `₹${monthSummary.cash.toLocaleString()}`, sub: 'received in cash', color: 'var(--green)' },
+            { label: 'UPI Received', value: `₹${monthSummary.upi.toLocaleString()}`, sub: 'to bank account', color: 'var(--blue)' },
+            { label: 'On Credit', value: `₹${monthSummary.credit.toLocaleString()}`, sub: 'pending payment', color: 'var(--red)' },
           ].map(s => (
             <div
               key={s.label}
@@ -782,45 +978,33 @@ const BillsTable = ({
                     color={payColor(bill.payment)}
                   />
                 </div>
-                {/* 👁 Eye icon — last column */}
-                <div
-                  style={{
-                    padding: '12px 8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
+                {/* 👁 Eye icon */}
+                <div style={{ padding: '12px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <button
                     onClick={() => setSelectedBill(bill)}
                     title='View bill details'
-                    style={{
-                      background: 'none',
-                      border: '1.5px solid var(--border)',
-                      borderRadius: 7,
-                      cursor: 'pointer',
-                      padding: '4px 7px',
-                      fontSize: 14,
-                      lineHeight: 1,
-                      color: 'var(--ink3)',
-                      transition: 'all .15s',
-                      display: 'flex',
-                      alignItems: 'center',
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = 'var(--accentbg)';
-                      e.currentTarget.style.borderColor = 'var(--accent)';
-                      e.currentTarget.style.color = 'var(--accent)';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = 'none';
-                      e.currentTarget.style.borderColor = 'var(--border)';
-                      e.currentTarget.style.color = 'var(--ink3)';
-                    }}
+                    style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: 7, cursor: 'pointer', padding: '4px 7px', fontSize: 14, lineHeight: 1, color: 'var(--ink3)', transition: 'all .15s', display: 'flex', alignItems: 'center' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--accentbg)'; e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--ink3)'; }}
                   >
                     👁
                   </button>
                 </div>
+
+                {/* ✏️ Edit icon — admin only */}
+                {isAdmin && (
+                  <div style={{ padding: '12px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <button
+                      onClick={() => setEditingBill(bill)}
+                      title='Edit bill'
+                      style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: 7, cursor: 'pointer', padding: '4px 7px', fontSize: 14, lineHeight: 1, color: 'var(--ink3)', transition: 'all .15s', display: 'flex', alignItems: 'center' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#f0fdf4'; e.currentTarget.style.borderColor = 'var(--green)'; e.currentTarget.style.color = 'var(--green)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--ink3)'; }}
+                    >
+                      ✏️
+                    </button>
+                  </div>
+                )}
               </div>
             ))
           )}
@@ -832,6 +1016,7 @@ const BillsTable = ({
 
 // ── Main billing page ─────────────────────────────────────────
 export const BillingPage = () => {
+  const isAdmin = _getRole() === 'Admin';
   const {
     view,
     setView,
@@ -853,8 +1038,12 @@ export const BillingPage = () => {
     total,
     selectedCustomer,
     payOpts,
-    todaySummary,
+    selectedMonth,
+    prevMonth,
+    nextMonth,
+    monthSummary,
     createBill,
+    updateBill,
     resetForm,
   } = useBilling();
 
@@ -952,6 +1141,23 @@ export const BillingPage = () => {
           ))}
         </div>
       </div>
+
+      {/* Month navigator — only in Sales view */}
+      {view === 'history' && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 16 }}>
+          <button
+            onClick={prevMonth}
+            style={{ background: 'var(--canvas)', border: '1.5px solid var(--border2)', borderRadius: 8, padding: '4px 13px', fontSize: 16, cursor: 'pointer', color: 'var(--ink2)', lineHeight: 1 }}
+          >‹</button>
+          <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink)', minWidth: 130, textAlign: 'center', fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+            {monthLabel(selectedMonth)}
+          </span>
+          <button
+            onClick={nextMonth}
+            style={{ background: 'var(--canvas)', border: '1.5px solid var(--border2)', borderRadius: 8, padding: '4px 13px', fontSize: 16, cursor: 'pointer', color: 'var(--ink2)', lineHeight: 1 }}
+          >›</button>
+        </div>
+      )}
 
       {view === 'entry' ? (
         <div className="erp-split">
@@ -1514,24 +1720,24 @@ export const BillingPage = () => {
                   marginBottom: 10,
                 }}
               >
-                Today's Summary
+                This Month's Summary
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                 {[
-                  { l: 'Bills raised', v: todaySummary.count, c: 'var(--ink)' },
+                  { l: 'Bills raised', v: monthSummary.count, c: 'var(--ink)' },
                   {
                     l: '💵 Cash',
-                    v: `₹${todaySummary.cash.toLocaleString()}`,
+                    v: `₹${monthSummary.cash.toLocaleString()}`,
                     c: 'var(--green)',
                   },
                   {
                     l: '🏦 UPI',
-                    v: `₹${todaySummary.upi.toLocaleString()}`,
+                    v: `₹${monthSummary.upi.toLocaleString()}`,
                     c: 'var(--blue)',
                   },
                   {
                     l: '📋 Credit',
-                    v: `₹${todaySummary.credit.toLocaleString()}`,
+                    v: `₹${monthSummary.credit.toLocaleString()}`,
                     c: 'var(--red)',
                   },
                 ].map(r => (
@@ -1597,9 +1803,9 @@ export const BillingPage = () => {
                   >
                     ₹
                     {(
-                      todaySummary.cash +
-                      todaySummary.upi +
-                      todaySummary.credit
+                      monthSummary.cash +
+                      monthSummary.upi +
+                      monthSummary.credit
                     ).toLocaleString()}
                   </span>
                 </div>
@@ -1608,7 +1814,14 @@ export const BillingPage = () => {
           </div>
         </div>
       ) : (
-        <BillsTable bills={bills} todaySummary={todaySummary} />
+        <BillsTable
+          bills={bills}
+          monthSummary={monthSummary}
+          selectedMonth={selectedMonth}
+          isAdmin={isAdmin}
+          customers={customers}
+          onEdit={updateBill}
+        />
       )}
     </div>
   );

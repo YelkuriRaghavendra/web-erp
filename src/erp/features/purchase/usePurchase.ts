@@ -2,7 +2,8 @@ import { useState, useMemo, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useERPStore } from '../../core/store';
 import { useToast } from '../../shared/hooks/useToast';
-import { syncPurchase, syncStock } from '../../core/supabase';
+import { syncPurchase, syncPurchaseUpdate, syncStock } from '../../core/supabase';
+import { ym } from '../../core/constants';
 import type { Purchase, PurchaseLine, Stock } from '../../core/types';
 
 type RowsMap = Record<string, { qty: string; rate: string }>;
@@ -37,6 +38,27 @@ export const usePurchase = () => {
   // ── Form state ────────────────────────────────────────────
   const [view, setView] = useState<'entry' | 'history'>('entry');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+
+  // ── Month navigation ──────────────────────────────────────
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  const [selectedMonth, setSelectedMonth] = useState(thisMonth);
+
+  const prevMonth = useCallback(() => {
+    setSelectedMonth(prev => {
+      const [y, m] = prev.split('-').map(Number);
+      const d = new Date(y, m - 2, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    });
+  }, []);
+
+  const nextMonth = useCallback(() => {
+    setSelectedMonth(prev => {
+      const [y, m] = prev.split('-').map(Number);
+      const d = new Date(y, m, 1);
+      const next = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      return next <= thisMonth ? next : prev;
+    });
+  }, [thisMonth]);
   const [note, setNote] = useState('');
   const [rows, setRows] = useState<RowsMap>(makeEmptyRows);
 
@@ -67,17 +89,21 @@ export const usePurchase = () => {
     [lines]
   );
 
-  // ── All-time stats ────────────────────────────────────────
-  const stats = useMemo(
+  // ── Selected month stats ──────────────────────────────────
+  const monthPurchases = useMemo(
+    () => purchases.filter(p => ym(p.date) === selectedMonth),
+    [purchases, selectedMonth]
+  );
+  const monthStats = useMemo(
     () => ({
-      totalOrders: purchases.length,
-      totalQty: purchases.reduce(
+      totalOrders: monthPurchases.length,
+      totalQty: monthPurchases.reduce(
         (s, p) => s + p.lines.reduce((ss, l) => ss + l.qty, 0),
         0
       ),
-      totalSpend: purchases.reduce((s, p) => s + p.grandTotal, 0),
+      totalSpend: monthPurchases.reduce((s, p) => s + p.grandTotal, 0),
     }),
-    [purchases]
+    [monthPurchases]
   );
 
   // ── Reset form ────────────────────────────────────────────
@@ -127,6 +153,31 @@ export const usePurchase = () => {
     showToast,
   ]);
 
+  // ── Update an existing purchase (admin only) ─────────────
+  const updatePurchase = useCallback((oldPO: Purchase, newPO: Purchase) => {
+    // 1. Replace purchase in store
+    setPurchases(prev => prev.map(p => p.id === newPO.id ? newPO : p));
+
+    // 2. Adjust stock: reverse old additions, apply new ones
+    setStock(prevStock => {
+      const s = { ...prevStock };
+      // Reverse old purchase stock additions
+      oldPO.lines.forEach(l => {
+        s[l.itemId] = { qty: Math.max(0, (s[l.itemId]?.qty ?? 0) - l.qty) };
+      });
+      // Apply new purchase stock additions
+      newPO.lines.forEach(l => {
+        s[l.itemId] = { qty: (s[l.itemId]?.qty ?? 0) + l.qty };
+      });
+      syncStock(s);
+      return s;
+    });
+
+    // 3. Sync to Supabase
+    syncPurchaseUpdate(newPO);
+    showToast(`✓ Purchase ${newPO.id} updated`, 'success');
+  }, [setPurchases, setStock, showToast]);
+
   return {
     view,
     setView,
@@ -141,8 +192,12 @@ export const usePurchase = () => {
     purchases,
     lines,
     grandTotal,
-    stats,
+    selectedMonth,
+    prevMonth,
+    nextMonth,
+    monthStats,
     recordPurchase,
+    updatePurchase,
     resetForm,
   };
 };
