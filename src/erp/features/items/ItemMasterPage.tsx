@@ -235,41 +235,46 @@ export const ItemMasterPage = () => {
               </div>
             </div>
           ) : (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                alignItems: 'center',
-                gap: 8,
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "'JetBrains Mono',monospace",
-                  fontWeight: 700,
-                  fontSize: 14,
-                  color: primaryPrice > 0 ? 'var(--ink)' : 'var(--ink3)',
-                }}
-              >
-                {item.prices.length > 0
-                  ? item.prices.map(p => `₹${p.price.toLocaleString()}`).join(', ')
-                  : 'Free'}
-              </span>
-              <button
-                onClick={() => startEditPrices(item.id, item.prices)}
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: 'var(--accent)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  textDecoration: 'underline',
-                  fontFamily: "'Plus Jakarta Sans',sans-serif",
-                }}
-              >
-                edit
-              </button>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
+                <span
+                  style={{
+                    fontFamily: "'JetBrains Mono',monospace",
+                    fontWeight: 700,
+                    fontSize: 14,
+                    color: primaryPrice > 0 ? 'var(--ink)' : 'var(--ink3)',
+                  }}
+                >
+                  {item.prices.length > 0
+                    ? item.prices.map(p => `₹${(p.price + (p.deposit ?? 0)).toLocaleString()}`).join(',  ')
+                    : 'Free'}
+                </span>
+                <button
+                  onClick={() => startEditPrices(item.id, item.prices)}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: 'var(--accent)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    fontFamily: "'Plus Jakarta Sans',sans-serif",
+                  }}
+                >
+                  edit
+                </button>
+              </div>
+              {item.prices.some(p => (p.deposit ?? 0) > 0) && (
+                <div style={{ marginTop: 3 }}>
+                  {item.prices.filter(p => (p.deposit ?? 0) > 0).map((p, i) => (
+                    <div key={i} style={{ fontSize: 10, lineHeight: 1.6 }}>
+                      <span style={{ color: 'var(--ink3)', fontWeight: 600 }}>Price: ₹{p.price.toLocaleString()}</span>
+                      <span style={{ color: 'var(--amber)', fontWeight: 600, marginLeft: 6 }}>Dep: ₹{p.deposit.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </td>

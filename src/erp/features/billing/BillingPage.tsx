@@ -1296,7 +1296,7 @@ export const BillingPage = () => {
               return item.prices.map((priceEntry, priceIdx) => {
                 const rowKey = `${item.id}-${priceEntry.id}`;
                 const qty = +(qtys[rowKey]?.qty || 0);
-                const tot = qty * priceEntry.price;
+                const finalPrice = priceEntry.price + priceEntry.deposit;
                 const has = qty > 0;
                 const isFirstPrice = priceIdx === 0;
 
@@ -1406,7 +1406,7 @@ export const BillingPage = () => {
                           color: 'var(--ink2)',
                         }}
                       >
-                        ₹{priceEntry.price.toLocaleString()}
+                        ₹{finalPrice.toLocaleString()}
                       </span>
                     </div>
                     <div style={{ padding: '12px 16px', textAlign: 'right' }}>
@@ -1418,7 +1418,7 @@ export const BillingPage = () => {
                           color: has ? 'var(--ink)' : 'var(--ink3)',
                         }}
                       >
-                        {has ? `₹${tot.toLocaleString()}` : '—'}
+                        {has ? `₹${(qty * finalPrice).toLocaleString()}` : '—'}
                       </span>
                     </div>
                   </div>
