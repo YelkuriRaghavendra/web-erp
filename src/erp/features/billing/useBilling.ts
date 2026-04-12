@@ -136,26 +136,29 @@ export const useBilling = () => {
     [bills, selectedMonth]
   );
   const monthSummary = useMemo(
-    () => ({
-      count: monthBills.length,
-      cash: monthBills
-        .filter(b => b.payment === 'Cash')
-        .reduce((s, b) => s + b.total, 0),
-      upi: monthBills
-        .filter(b => b.payment === 'UPI')
-        .reduce((s, b) => s + b.total, 0),
-      credit: monthBills
-        .filter(b => b.payment === 'Credit')
-        .reduce((s, b) => s + b.total, 0),
-      totalDeposits: monthBills.reduce(
+    () => {
+      const billGrandTotal = (b: Bill) =>
+        b.total + b.lines.reduce((ls, l) => ls + l.qty * l.deposit, 0);
+      const totalCollected = monthBills.reduce((s, b) => s + billGrandTotal(b), 0);
+      const totalDeposits = monthBills.reduce(
         (s, b) => s + b.lines.reduce((ls, l) => ls + l.qty * l.deposit, 0),
         0
-      ),
-      netRevenue: monthBills.reduce(
-        (s, b) => s + b.total - b.lines.reduce((ls, l) => ls + l.qty * l.deposit, 0),
-        0
-      ),
-    }),
+      );
+      return {
+        count: monthBills.length,
+        cash: monthBills
+          .filter(b => b.payment === 'Cash')
+          .reduce((s, b) => s + billGrandTotal(b), 0),
+        upi: monthBills
+          .filter(b => b.payment === 'UPI')
+          .reduce((s, b) => s + billGrandTotal(b), 0),
+        credit: monthBills
+          .filter(b => b.payment === 'Credit')
+          .reduce((s, b) => s + billGrandTotal(b), 0),
+        totalDeposits,
+        netRevenue: totalCollected - totalDeposits,
+      };
+    },
     [monthBills]
   );
 

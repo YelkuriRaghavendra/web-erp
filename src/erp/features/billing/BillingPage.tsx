@@ -320,7 +320,7 @@ const BillDetailModal = ({
                     fontWeight: 600,
                   }}
                 >
-                  ₹{line.price.toLocaleString()}
+                  ₹{(line.price + (line.deposit ?? 0)).toLocaleString()}
                 </div>
                 <div
                   style={{
@@ -332,7 +332,7 @@ const BillDetailModal = ({
                     color: 'var(--ink)',
                   }}
                 >
-                  ₹{line.amount.toLocaleString()}
+                  ₹{(line.amount + line.qty * (line.deposit ?? 0)).toLocaleString()}
                 </div>
               </div>
             ))
@@ -362,7 +362,7 @@ const BillDetailModal = ({
               color: 'var(--accent)',
             }}
           >
-            ₹{bill.total.toLocaleString()}
+            ₹{(bill.total + bill.lines.reduce((s, l) => s + l.qty * (l.deposit ?? 0), 0)).toLocaleString()}
           </span>
         </div>
 
@@ -973,7 +973,7 @@ const BillsTable = ({
                       color: 'var(--accent)',
                     }}
                   >
-                    ₹{bill.total.toLocaleString()}
+                    ₹{(bill.total + bill.lines.reduce((s, l) => s + l.qty * (l.deposit ?? 0), 0)).toLocaleString()}
                   </span>
                 </div>
                 {/* Payment */}
