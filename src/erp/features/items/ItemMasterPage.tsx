@@ -33,7 +33,7 @@ export const ItemMasterPage = () => {
     setItemType,
     addItem,
     savePrices,
-    // saveBundleComponents — available for future bundle component UI
+    saveBundleComponents,
     toggleItem,
     pendingToggleItem,
     requestToggle,
@@ -54,6 +54,9 @@ export const ItemMasterPage = () => {
     unlinkItem,
     closeLinkEdit,
   } = useItems();
+
+  // ── Bundle components editor state ───────────────────────
+  const [bundleEditId, setBundleEditId] = useState<string | null>(null);
 
   // ── Inline price editing state ────────────────────────────
   const [editingPricesId, setEditingPricesId] = useState<string | null>(null);
@@ -117,18 +120,12 @@ export const ItemMasterPage = () => {
               </div>
               <div style={{ fontSize: 11, color: 'var(--ink3)', marginTop: 2 }}>
                 ID #{item.id} · {item.unit}
-                {srcItem && (
-                  <span
-                    style={{
-                      marginLeft: 6,
-                      color: 'var(--purple)',
-                      fontWeight: 700,
-                    }}
-                  >
-                    ← stock from {srcItem.name}
-                  </span>
-                )}
               </div>
+              {item.itemType === 'linked' && item.bundleComponents.length > 0 && (
+                <div style={{ fontSize: 11, color: 'var(--purple)', fontWeight: 600, marginTop: 3 }}>
+                  Bundle: {item.bundleComponents.map(c => `${c.qty}x ${c.componentItemName}`).join(', ')}
+                </div>
+              )}
             </div>
           </div>
         </td>
@@ -367,22 +364,40 @@ export const ItemMasterPage = () => {
                 Link
               </button>
             ) : (
-              <button
-                onClick={() => unlinkItem(item.id)}
-                style={{
-                  padding: '5px 12px',
-                  borderRadius: 7,
-                  border: '1px solid var(--amberbd)',
-                  background: 'var(--amberbg)',
-                  color: 'var(--amber)',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  fontFamily: "'Plus Jakarta Sans',sans-serif",
-                }}
-              >
-                Unlink
-              </button>
+              <>
+                <button
+                  onClick={() => setBundleEditId(item.id)}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: 7,
+                    border: '1px solid var(--purplebd)',
+                    background: 'var(--purplebg)',
+                    color: 'var(--purple)',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    fontFamily: "'Plus Jakarta Sans',sans-serif",
+                  }}
+                >
+                  Bundle
+                </button>
+                <button
+                  onClick={() => unlinkItem(item.id)}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: 7,
+                    border: '1px solid var(--amberbd)',
+                    background: 'var(--amberbg)',
+                    color: 'var(--amber)',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    fontFamily: "'Plus Jakarta Sans',sans-serif",
+                  }}
+                >
+                  Unlink
+                </button>
+              </>
             )}
             <button
               onClick={() =>
@@ -1268,6 +1283,130 @@ export const ItemMasterPage = () => {
           </div>
         </Modal>
       )}
+      {/* Bundle components editor modal */}
+      {bundleEditId !== null && (() => {
+        const bundleItem = items.find(i => i.id === bundleEditId);
+        if (!bundleItem) return null;
+        const availableItems = items.filter(
+          i => i.active && i.itemType !== 'linked' && !bundleItem.bundleComponents.some(c => c.componentItemId === i.id)
+        );
+        return (
+          <Modal
+            title={`Bundle Components — ${bundleItem.name}`}
+            onClose={() => setBundleEditId(null)}
+            width={500}
+          >
+            <p style={{ fontSize: 13, color: 'var(--ink2)', marginBottom: 16, lineHeight: 1.5 }}>
+              When this item is billed, the following items will be deducted from stock.
+            </p>
+
+            {/* Current components */}
+            {bundleItem.bundleComponents.length > 0 ? (
+              <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 40px', padding: '8px 14px', background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Component Item</span>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.06em', textAlign: 'center' }}>Qty</span>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.06em', textAlign: 'center' }}>Stock</span>
+                  <span />
+                </div>
+                {bundleItem.bundleComponents.map((comp, ci) => (
+                  <div
+                    key={comp.id}
+                    style={{
+                      display: 'grid', gridTemplateColumns: '1fr 80px 80px 40px',
+                      padding: '10px 14px', alignItems: 'center',
+                      borderBottom: ci < bundleItem.bundleComponents.length - 1 ? '1px solid var(--border)' : 'none',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{comp.componentItemName}</div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <input
+                        type="number"
+                        min="1"
+                        value={comp.qty}
+                        onChange={e => {
+                          const val = parseFloat(e.target.value);
+                          if (!isNaN(val) && val > 0) {
+                            saveBundleComponents(bundleItem.id,
+                              bundleItem.bundleComponents.map(c =>
+                                c.id === comp.id ? { ...c, qty: val } : c
+                              )
+                            );
+                          }
+                        }}
+                        style={{
+                          width: 50, textAlign: 'center', padding: '5px 6px',
+                          border: '1px solid var(--border2)', borderRadius: 6,
+                          fontFamily: "'JetBrains Mono',monospace", fontWeight: 700,
+                          fontSize: 14, color: 'var(--ink)', outline: 'none',
+                        }}
+                      />
+                    </div>
+                    <div style={{ textAlign: 'center', fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, fontSize: 13, color: (stock[comp.componentItemId]?.qty ?? 0) > 0 ? 'var(--green)' : 'var(--red)' }}>
+                      {stock[comp.componentItemId]?.qty ?? 0}
+                    </div>
+                    <button
+                      onClick={() => saveBundleComponents(bundleItem.id,
+                        bundleItem.bundleComponents.filter(c => c.id !== comp.id)
+                      )}
+                      style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 18, padding: 0, lineHeight: 1 }}
+                    >
+                      x
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--ink3)', fontSize: 13, background: 'var(--bg)', borderRadius: 10, marginBottom: 16, border: '1px dashed var(--border2)' }}>
+                No components added yet. Add items below.
+              </div>
+            )}
+
+            {/* Add component */}
+            {availableItems.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 8 }}>Add Component</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
+                  {availableItems.map(candidate => (
+                    <button
+                      key={candidate.id}
+                      onClick={() => {
+                        saveBundleComponents(bundleItem.id, [
+                          ...bundleItem.bundleComponents,
+                          {
+                            id: `new-${Date.now()}`,
+                            componentItemId: candidate.id,
+                            componentItemName: candidate.name,
+                            qty: 1,
+                          },
+                        ]);
+                      }}
+                      style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        width: '100%', textAlign: 'left', padding: '8px 12px',
+                        background: 'var(--canvas)', border: '1px solid var(--border)',
+                        borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                        fontFamily: "'Plus Jakarta Sans',sans-serif",
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'var(--canvas)')}
+                    >
+                      <span>{candidate.name}</span>
+                      <span style={{ fontSize: 11, color: 'var(--ink3)' }}>{stock[candidate.id]?.qty ?? 0} in stock</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Btn onClick={() => setBundleEditId(null)}>Done</Btn>
+            </div>
+          </Modal>
+        );
+      })()}
     </div>
   );
 };
