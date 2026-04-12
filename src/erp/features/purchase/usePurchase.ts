@@ -23,7 +23,7 @@ export const usePurchase = () => {
   // 'linked' items are never purchased from suppliers — they draw stock from
   // another item when billed. Exclude them from the purchase form entirely.
   const activeItems = useMemo(
-    () => items.filter(i => i.active && i.itemType !== 'linked'),
+    () => items.filter(i => i.active && i.itemType !== 'linked' && i.itemType !== 'service'),
     [items]
   );
 

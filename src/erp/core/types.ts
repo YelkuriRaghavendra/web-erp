@@ -39,7 +39,7 @@ export interface StaffUser extends ERPUser {
 // 'cylinder' → own stock; shown in Cylinders section; purchase + billing
 // 'linked'   → NO own stock; draws from stockSourceId when billed;
 //              NEVER shown in the purchase form
-export type ItemType = 'regular' | 'cylinder' | 'linked';
+export type ItemType = 'regular' | 'cylinder' | 'linked' | 'service';
 
 // ── Item Prices ────────────────────────────────────────────
 export interface ItemPrice {

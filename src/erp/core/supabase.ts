@@ -417,6 +417,17 @@ export const insertStockRow = async (itemId: string): Promise<void> => {
   if (error) console.warn('[Supabase] insertStockRow:', error);
 };
 
+/** Delete an item and its related data (prices, components, stock). */
+export const deleteItem = async (itemId: string): Promise<void> => {
+  // item_prices and bundle_components cascade on delete.
+  // stock also cascades. Delete the item row — everything else follows.
+  const { error } = await supabase
+    .from('items')
+    .delete()
+    .eq('item_id', Number(itemId));
+  if (error) throw error;
+};
+
 /** Insert a new customer row; returns the DB-generated customer_id as string. */
 export const insertCustomer = async (data: Omit<Customer, 'id'>): Promise<string> => {
   const { data: row, error } = await supabase

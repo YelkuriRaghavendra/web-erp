@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useERPStore } from '../../core/store';
 import { useToast } from '../../shared/hooks/useToast';
-import { syncItems, syncStock, insertItem, insertStockRow } from '../../core/supabase';
+import { syncItems, syncStock, insertItem, insertStockRow, deleteItem as dbDeleteItem } from '../../core/supabase';
 import type { ItemType } from '../../core/types';
 
 type Filter = 'all' | 'active' | 'inactive';
@@ -158,6 +158,39 @@ export const useItems = () => {
   const pendingToggleItem = useMemo(
     () => (pendingToggleId ? (items.find(i => i.id === pendingToggleId) ?? null) : null),
     [pendingToggleId, items]
+  );
+
+  // ── Delete item ──────────────────────────────────────────
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  const requestDelete = useCallback((id: string) => {
+    setPendingDeleteId(id);
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    if (pendingDeleteId === null) return;
+    const id = pendingDeleteId;
+    try {
+      await dbDeleteItem(id);
+      setItems(p => p.filter(it => it.id !== id));
+      setStock(p => {
+        const updated = { ...p };
+        delete updated[id];
+        return updated;
+      });
+      showToast('Item deleted');
+    } catch (err) {
+      console.warn('[deleteItem]', err);
+      showToast('Failed to delete — item may be referenced in bills', 'error');
+    }
+    setPendingDeleteId(null);
+  }, [pendingDeleteId, setItems, setStock, showToast]);
+
+  const cancelDelete = useCallback(() => setPendingDeleteId(null), []);
+
+  const pendingDeleteItem = useMemo(
+    () => (pendingDeleteId ? (items.find(i => i.id === pendingDeleteId) ?? null) : null),
+    [pendingDeleteId, items]
   );
 
   // ── Stock adjust modal ────────────────────────────────────
@@ -346,6 +379,12 @@ export const useItems = () => {
     openAdjust,
     saveAdjust,
     closeAdjust,
+    // delete
+    pendingDeleteId,
+    pendingDeleteItem,
+    requestDelete,
+    confirmDelete,
+    cancelDelete,
     // link / unlink
     linkEditId,
     linkEditSourceId,

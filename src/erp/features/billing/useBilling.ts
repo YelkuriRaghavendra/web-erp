@@ -51,11 +51,8 @@ export const useBilling = () => {
     return items.filter(i => {
       if (!i.active) return false;
       if (i.prices.length === 0) return false;
-      if (i.itemType === 'linked') {
-        if (i.bundleComponents.length === 0) return false;
-        return i.bundleComponents.every(
-          c => (stock[c.componentItemId]?.qty ?? 0) >= c.qty
-        );
+      if (i.itemType === 'linked' || i.itemType === 'service') {
+        return true;
       }
       return (stock[i.id]?.qty ?? 0) > 0;
     });
@@ -204,7 +201,7 @@ export const useBilling = () => {
     // 3. Validate own-stock items (regular + cylinder)
     const overstock = Object.entries(qtyPerItem).filter(([itemId, totalQty]) => {
       const item = items.find(i => i.id === itemId);
-      if (!item || item.itemType === 'linked') return false;
+      if (!item || item.itemType === 'linked' || item.itemType === 'service') return false;
       return totalQty > (stock[itemId]?.qty ?? 0);
     });
     if (overstock.length) {
@@ -242,6 +239,7 @@ export const useBilling = () => {
 
       for (const [itemId, totalQty] of Object.entries(qtyPerItem2)) {
         const item = items.find(i => i.id === itemId);
+        if (item?.itemType === 'service') continue; // no stock to deduct
         if (item?.itemType === 'linked') {
           item.bundleComponents.forEach(comp => {
             const deductQty = totalQty * comp.qty;
@@ -331,6 +329,7 @@ export const useBilling = () => {
       const oldQtyMap = aggregateQty(oldBill.lines);
       for (const [itemId, qty] of Object.entries(oldQtyMap)) {
         const item = items.find(i => i.id === itemId);
+        if (item?.itemType === 'service') continue;
         if (item?.itemType === 'linked') {
           item.bundleComponents.forEach(comp => {
             s[comp.componentItemId] = { qty: (s[comp.componentItemId]?.qty ?? 0) + qty * comp.qty };
@@ -344,6 +343,7 @@ export const useBilling = () => {
       const newQtyMap = aggregateQty(newBill.lines);
       for (const [itemId, qty] of Object.entries(newQtyMap)) {
         const item = items.find(i => i.id === itemId);
+        if (item?.itemType === 'service') continue;
         if (item?.itemType === 'linked') {
           item.bundleComponents.forEach(comp => {
             s[comp.componentItemId] = { qty: Math.max(0, (s[comp.componentItemId]?.qty ?? 0) - qty * comp.qty) };

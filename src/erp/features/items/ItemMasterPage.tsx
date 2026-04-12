@@ -8,11 +8,13 @@ const TYPE_LABELS: Record<ItemType, string> = {
   regular: 'Regular',
   cylinder: 'Cylinder',
   linked: 'Linked',
+  service: 'Service',
 };
-const TYPE_BADGE_COLOR: Record<ItemType, 'orange' | 'blue' | 'purple'> = {
+const TYPE_BADGE_COLOR: Record<ItemType, 'orange' | 'blue' | 'purple' | 'green'> = {
   regular: 'orange',
   cylinder: 'blue',
   linked: 'purple',
+  service: 'green',
 };
 
 export const ItemMasterPage = () => {
@@ -39,6 +41,10 @@ export const ItemMasterPage = () => {
     requestToggle,
     confirmToggle,
     cancelToggle,
+    pendingDeleteItem,
+    requestDelete,
+    confirmDelete,
+    cancelDelete,
     adjustItem,
     adjustItemData,
     adjustQty,
@@ -421,6 +427,22 @@ export const ItemMasterPage = () => {
               }}
             >
               {item.active ? 'Disable' : 'Enable'}
+            </button>
+            <button
+              onClick={() => requestDelete(item.id)}
+              style={{
+                padding: '5px 14px',
+                borderRadius: 7,
+                border: '1px solid var(--redbd)',
+                background: 'var(--redbg)',
+                color: 'var(--red)',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontFamily: "'Plus Jakarta Sans',sans-serif",
+              }}
+            >
+              Delete
             </button>
           </div>
         </td>
@@ -1199,6 +1221,46 @@ export const ItemMasterPage = () => {
               style={{ background: 'var(--red)', border: 'none' }}
             >
               Yes, Disable
+            </Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* Delete item confirmation modal */}
+      {pendingDeleteItem && (
+        <Modal title='Delete Item?' onClose={cancelDelete} width={400}>
+          <div
+            style={{
+              background: 'var(--redbg)',
+              border: '1px solid var(--redbd)',
+              borderRadius: 8,
+              padding: '12px 16px',
+              fontSize: 13,
+              color: 'var(--red)',
+              fontWeight: 600,
+              marginBottom: 4,
+            }}
+          >
+            This will permanently delete <strong>{pendingDeleteItem.name}</strong> and its prices, stock, and bundle components. Existing bills referencing this item will not be affected.
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              gap: 10,
+              justifyContent: 'flex-end',
+              borderTop: '1px solid var(--border)',
+              paddingTop: 14,
+              marginTop: 4,
+            }}
+          >
+            <Btn variant='ghost' onClick={cancelDelete}>
+              Cancel
+            </Btn>
+            <Btn
+              onClick={confirmDelete}
+              style={{ background: 'var(--red)', border: 'none' }}
+            >
+              Yes, Delete
             </Btn>
           </div>
         </Modal>
