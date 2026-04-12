@@ -146,7 +146,7 @@ export const fetchCustomers = async (): Promise<Customer[]> => {
     return [];
   }
   return (data ?? []).map(r => ({
-    id: r.customer_id as string,
+    id: String(r.customer_id),
     name: r.name as string,
     phone: (r.phone ?? '') as string,
     address: (r.address ?? '') as string,
@@ -170,7 +170,7 @@ export const fetchBills = async (): Promise<Bill[]> => {
   return (data ?? []).map(b => ({
     id: b.bill_id as string,
     date: b.date as string,
-    customerId: (b.customer_id ?? null) as string | null,
+    customerId: b.customer_id != null ? String(b.customer_id) : null,
     customerName: (b.customer_name ?? '') as string,
     payment: b.payment as 'Cash' | 'UPI' | 'Credit',
     total: Number(b.total),
