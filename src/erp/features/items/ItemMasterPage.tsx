@@ -1133,6 +1133,7 @@ export const ItemMasterPage = () => {
               { v: 'regular', l: 'Regular — own stock, appears in purchase & billing' },
               { v: 'cylinder', l: 'Cylinder — gas cylinder, shown in Cylinders section' },
               { v: 'linked', l: 'Linked — draws stock from another item when billed' },
+              { v: 'service', l: 'Service — no stock, always visible in billing' },
             ]}
           />
 

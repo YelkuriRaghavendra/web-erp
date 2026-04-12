@@ -75,9 +75,9 @@ export const useItems = () => {
     [items, passes]
   );
 
-  // Regular items — everything else
+  // Regular + Service items — everything that's not cylinder or linked
   const otherItems = useMemo(
-    () => items.filter(i => i.itemType === 'regular' && passes(i.active)),
+    () => items.filter(i => (i.itemType === 'regular' || i.itemType === 'service') && passes(i.active)),
     [items, passes]
   );
 
