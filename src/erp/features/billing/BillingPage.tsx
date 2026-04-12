@@ -1293,12 +1293,12 @@ export const BillingPage = () => {
                   ))
                 : (stock[item.id]?.qty ?? 0);
 
-              return item.prices.map((priceEntry, priceIdx) => {
+              return item.prices.map((priceEntry) => {
                 const rowKey = `${item.id}-${priceEntry.id}`;
                 const qty = +(qtys[rowKey]?.qty || 0);
-                const finalPrice = priceEntry.price + priceEntry.deposit;
+                const currentDeposit = qtys[rowKey]?.deposit !== undefined ? (parseFloat(qtys[rowKey].deposit!) || 0) : (priceEntry.deposit ?? 0);
+                const finalPrice = priceEntry.price + currentDeposit;
                 const has = qty > 0;
-                const isFirstPrice = priceIdx === 0;
 
                 return (
                   <div
@@ -1339,38 +1339,32 @@ export const BillingPage = () => {
                         >
                           {item.name}
                         </div>
-                        {isFirstPrice && (
-                          <div
-                            style={{
-                              fontSize: 11,
-                              marginTop: 3,
-                              fontWeight: 600,
-                              color: 'var(--green)',
-                            }}
-                          >
-                            {avail} {item.itemType === 'linked' ? 'available' : 'in stock'}
-                            {priceEntry.deposit > 0 && (
-                              <span style={{ color: 'var(--amber)', marginLeft: 6 }}>
-                                · Deposit: ₹{priceEntry.deposit.toLocaleString()}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        {!isFirstPrice && (
-                          <div
-                            style={{
-                              fontSize: 11,
-                              marginTop: 3,
-                              color: 'var(--ink3)',
-                              fontStyle: 'italic',
-                            }}
-                          >
-                            alt price
-                            {priceEntry.deposit > 0 && (
-                              <span style={{ color: 'var(--amber)', marginLeft: 6 }}>
-                                · Deposit: ₹{priceEntry.deposit.toLocaleString()}
-                              </span>
-                            )}
+                        <div
+                          style={{
+                            fontSize: 11,
+                            marginTop: 3,
+                            fontWeight: 600,
+                            color: 'var(--green)',
+                          }}
+                        >
+                          {avail} {item.itemType === 'linked' ? 'available' : 'in stock'}
+                        </div>
+                        {priceEntry.deposit > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                            <span style={{ fontSize: 10, color: 'var(--amber)', fontWeight: 600 }}>Dep: ₹</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={qtys[rowKey]?.deposit ?? String(priceEntry.deposit)}
+                              onChange={e => setQtyField(rowKey, 'deposit', e.target.value)}
+                              style={{
+                                width: 60, padding: '2px 4px', fontSize: 11,
+                                border: '1px solid var(--border2)', borderRadius: 4,
+                                background: 'var(--canvas)', color: 'var(--amber)',
+                                fontFamily: "'JetBrains Mono',monospace", fontWeight: 700,
+                                outline: 'none', textAlign: 'right',
+                              }}
+                            />
                           </div>
                         )}
                       </div>
@@ -1381,7 +1375,7 @@ export const BillingPage = () => {
                         min="0"
                         placeholder="—"
                         value={qtys[rowKey]?.qty || ''}
-                        onChange={e => setQtyField(rowKey, e.target.value)}
+                        onChange={e => setQtyField(rowKey, 'qty', e.target.value)}
                         style={{
                           width: '100%',
                           textAlign: 'center',
@@ -1499,9 +1493,9 @@ export const BillingPage = () => {
                     Enter quantities to start
                   </div>
                 ) : (
-                  lines.map(l => (
+                  lines.map((l, li) => (
                     <div
-                      key={l.itemId}
+                      key={`${l.itemId}-${l.price}-${li}`}
                       style={{
                         display: 'flex',
                         justifyContent: 'space-between',

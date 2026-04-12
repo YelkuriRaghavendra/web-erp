@@ -6,7 +6,7 @@ import { syncBill, syncBillUpdate, syncCustomer, syncStock } from '../../core/su
 import { ym } from '../../core/constants';
 import type { Bill, BillLine } from '../../core/types';
 
-type QtysMap = Record<string, { qty: string }>;
+type QtysMap = Record<string, { qty: string; deposit?: string }>;
 
 export const useBilling = () => {
   const { items, stock, customers, bills, setBills, setStock, setCustomers } =
@@ -63,7 +63,7 @@ export const useBilling = () => {
     const q: QtysMap = {};
     activeItems.forEach(i => {
       i.prices.forEach(p => {
-        q[`${i.id}-${p.id}`] = { qty: '' };
+        q[`${i.id}-${p.id}`] = { qty: '', deposit: String(p.deposit ?? 0) };
       });
     });
     return q;
@@ -90,8 +90,8 @@ export const useBilling = () => {
 
   // ── Per-cell setter ───────────────────────────────────────
   const setQtyField = useCallback(
-    (key: string, v: string) =>
-      setQtys(p => ({ ...p, [key]: { qty: v } })),
+    (key: string, field: 'qty' | 'deposit', v: string) =>
+      setQtys(p => ({ ...p, [key]: { ...p[key], [field]: v } })),
     []
   );
 
@@ -101,14 +101,18 @@ export const useBilling = () => {
       activeItems.flatMap(i =>
         i.prices
           .filter(p => +(qtys[`${i.id}-${p.id}`]?.qty || 0) > 0)
-          .map(p => ({
-            itemId: i.id,
-            itemName: i.name,
-            qty: +(qtys[`${i.id}-${p.id}`].qty),
-            price: p.price,
-            deposit: p.deposit ?? 0,
-            amount: +(qtys[`${i.id}-${p.id}`].qty) * p.price,
-          }))
+          .map(p => {
+            const row = qtys[`${i.id}-${p.id}`];
+            const dep = row?.deposit !== undefined ? parseFloat(row.deposit) || 0 : (p.deposit ?? 0);
+            return {
+              itemId: i.id,
+              itemName: i.name,
+              qty: +(row.qty),
+              price: p.price,
+              deposit: dep,
+              amount: +(row.qty) * p.price,
+            };
+          })
       ),
     [qtys, activeItems]
   );
@@ -187,6 +191,9 @@ export const useBilling = () => {
       const item = items.find(i => i.id === itemId);
       if (item?.itemType !== 'linked') continue;
       for (const comp of item.bundleComponents) {
+        // Skip stock check for service components (no stock tracking)
+        const compItem = items.find(i => i.id === comp.componentItemId);
+        if (compItem?.itemType === 'service') continue;
         const needed = totalQty * comp.qty;
         const available = stock[comp.componentItemId]?.qty ?? 0;
         const directQty = qtyPerItem[comp.componentItemId] ?? 0;
