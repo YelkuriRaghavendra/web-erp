@@ -119,15 +119,12 @@ export const useBilling = () => {
 
   // ── Payment options ───────────────────────────────────────
   const payOpts = useMemo(
-    () =>
-      selectedCustomer?.credit
-        ? [{ v: 'Credit' as const, l: 'Credit', icon: '📋' }]
-        : [
-            { v: 'Cash' as const, l: 'Cash', icon: '💵' },
-            { v: 'UPI' as const, l: 'UPI', icon: '🏦' },
-            { v: 'Credit' as const, l: 'Credit', icon: '📋' },
-          ],
-    [selectedCustomer]
+    () => [
+      { v: 'Cash' as const, l: 'Cash', icon: '💵' },
+      { v: 'UPI' as const, l: 'UPI', icon: '🏦' },
+      { v: 'Credit' as const, l: 'Credit', icon: '📋' },
+    ],
+    []
   );
 
   // ── Selected month billing summary ────────────────────────
