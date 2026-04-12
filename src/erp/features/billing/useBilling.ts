@@ -114,6 +114,8 @@ export const useBilling = () => {
   );
 
   const total = useMemo(() => lines.reduce((s, l) => s + l.amount, 0), [lines]);
+  const totalDeposit = useMemo(() => lines.reduce((s, l) => s + l.qty * l.deposit, 0), [lines]);
+  const grandTotal = useMemo(() => total + totalDeposit, [total, totalDeposit]);
 
   // ── Payment options ───────────────────────────────────────
   const payOpts = useMemo(
@@ -380,6 +382,8 @@ export const useBilling = () => {
     bills,
     lines,
     total,
+    totalDeposit,
+    grandTotal,
     selectedCustomer,
     payOpts,
     selectedMonth,

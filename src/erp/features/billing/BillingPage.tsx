@@ -1040,7 +1040,7 @@ export const BillingPage = () => {
     customers,
     bills,
     lines,
-    total,
+    grandTotal,
     selectedCustomer,
     payOpts,
     selectedMonth,
@@ -1473,11 +1473,11 @@ export const BillingPage = () => {
                     style={{
                       fontSize: 28,
                       fontWeight: 900,
-                      color: total > 0 ? '#ff9a5c' : 'rgba(255,255,255,.2)',
+                      color: grandTotal > 0 ? '#ff9a5c' : 'rgba(255,255,255,.2)',
                       fontFamily: "'JetBrains Mono',monospace",
                     }}
                   >
-                    ₹{total.toLocaleString()}
+                    ₹{grandTotal.toLocaleString()}
                   </span>
                   <span style={{ fontSize: 12, color: 'rgba(255,255,255,.3)' }}>
                     {lines.length} item{lines.length !== 1 ? 's' : ''}
@@ -1521,7 +1521,7 @@ export const BillingPage = () => {
                             marginTop: 1,
                           }}
                         >
-                          {l.qty} × ₹{l.price.toLocaleString()}
+                          {l.qty} × ₹{(l.price + l.deposit).toLocaleString()}
                         </div>
                       </div>
                       <span
@@ -1532,7 +1532,7 @@ export const BillingPage = () => {
                           color: 'var(--accent)',
                         }}
                       >
-                        ₹{l.amount.toLocaleString()}
+                        ₹{(l.amount + l.qty * l.deposit).toLocaleString()}
                       </span>
                     </div>
                   ))
@@ -1725,7 +1725,7 @@ export const BillingPage = () => {
                   }}
                 >
                   {lines.length
-                    ? `Create Bill · ₹${total.toLocaleString()}`
+                    ? `Create Bill · ₹${grandTotal.toLocaleString()}`
                     : 'Enter items to bill'}
                 </button>
               </div>
