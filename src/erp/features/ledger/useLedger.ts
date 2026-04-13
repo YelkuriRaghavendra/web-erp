@@ -68,7 +68,7 @@ export const useLedger = () => {
         if (c.id !== selectedId) return c;
         const ledger = c.ledger ?? [];
         const prevBal =
-          ledger.length > 0 ? ledger[ledger.length - 1].balance : 0;
+          ledger.length > 0 ? ledger[ledger.length - 1].balance : c.outstanding;
         const balance =
           entryForm.type === 'DEBIT'
             ? prevBal + amt
@@ -86,7 +86,7 @@ export const useLedger = () => {
             ? c.outstanding + amt
             : Math.max(0, c.outstanding - amt);
         const updated = { ...c, outstanding, ledger: [...ledger, newEntry] };
-        syncCustomer(updated);
+        syncCustomer(updated).catch(() => {});
         return updated;
       })
     );

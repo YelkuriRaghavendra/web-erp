@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   Page,
   Table,
@@ -30,10 +31,12 @@ export const CustomersPage = () => {
     recordPayment,
   } = useCustomers();
 
+  const creditCount = useMemo(() => customers.filter(c => c.credit).length, [customers]);
+
   return (
     <Page
       title='Customers'
-      subtitle={`${customers.length} customers · ${customers.filter(c => c.credit).length} credit accounts`}
+      subtitle={`${customers.length} customers · ${creditCount} credit accounts`}
       action={<Btn onClick={openAdd}>+ Add Customer</Btn>}
     >
       {customers.length === 0 ? (
@@ -188,7 +191,7 @@ export const CustomersPage = () => {
               type='checkbox'
               checked={Boolean(form.credit)}
               onChange={e =>
-                setField('credit', e.target.checked as unknown as string)
+                setField('credit', e.target.checked)
               }
               style={{ width: 16, height: 16, accentColor: 'var(--accent)' }}
             />

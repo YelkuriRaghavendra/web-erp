@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useERPStore } from '../../core/store';
 import { useToast } from '../../shared/hooks/useToast';
-import { syncPurchase, syncPurchaseUpdate, syncStock } from '../../core/supabase';
+import { syncPurchase, syncPurchaseUpdate, deletePurchase as dbDeletePurchase, syncStock } from '../../core/supabase';
 import { ym } from '../../core/constants';
 import type { Purchase, PurchaseLine, Stock } from '../../core/types';
 
@@ -184,6 +184,29 @@ export const usePurchase = () => {
     showToast(`✓ Purchase ${newPO.id} updated`, 'success');
   }, [setPurchases, setStock, showToast]);
 
+  // ── Delete purchase ─────────────────────────────────────
+  const removePurchase = useCallback(async (po: Purchase) => {
+    try {
+      await dbDeletePurchase(po.id);
+      setPurchases(prev => prev.filter(p => p.id !== po.id));
+
+      // Reverse stock additions
+      setStock(prevStock => {
+        const s = { ...prevStock };
+        po.lines.forEach(l => {
+          s[l.itemId] = { qty: Math.max(0, (s[l.itemId]?.qty ?? 0) - l.qty) };
+        });
+        syncStock(s);
+        return s;
+      });
+
+      showToast(`✓ Purchase ${po.id} deleted`, 'success');
+    } catch (err) {
+      console.warn('[deletePurchase]', err);
+      showToast('Failed to delete purchase', 'error');
+    }
+  }, [setPurchases, setStock, showToast]);
+
   return {
     view,
     setView,
@@ -208,6 +231,7 @@ export const usePurchase = () => {
     monthStats,
     recordPurchase,
     updatePurchase,
+    removePurchase,
     resetForm,
   };
 };

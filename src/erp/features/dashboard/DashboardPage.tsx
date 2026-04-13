@@ -278,6 +278,20 @@ export const DashboardPage = () => {
     [items, stock]
   );
 
+  // ── Items sold this month ────────────────────────────────────
+  const itemsSold = useMemo(() => {
+    const mBills = bills.filter(b => ym(b.date) === currentMonth);
+    const map: Record<string, { name: string; qty: number; amount: number }> = {};
+    mBills.forEach(b => {
+      b.lines.forEach(l => {
+        if (!map[l.itemId]) map[l.itemId] = { name: l.itemName, qty: 0, amount: 0 };
+        map[l.itemId].qty += l.qty;
+        map[l.itemId].amount += l.amount + l.qty * (l.deposit ?? 0);
+      });
+    });
+    return Object.values(map).sort((a, b) => b.qty - a.qty);
+  }, [bills, currentMonth]);
+
   // ── Recent bills ─────────────────────────────────────────────
   const recentBills = useMemo(() => [...bills].slice(0, 8), [bills]);
 
@@ -762,6 +776,72 @@ export const DashboardPage = () => {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* ── ITEMS SOLD THIS MONTH ─────────────────────── */}
+      <div
+        style={{
+          background: 'var(--canvas)',
+          border: '1px solid var(--border)',
+          borderRadius: 14,
+          overflow: 'hidden',
+          boxShadow: 'var(--shadow)',
+        }}
+      >
+        <div
+          style={{
+            padding: '14px 20px',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <span style={{ fontWeight: 800, fontSize: 13 }}>📦 Items Sold — {monthLabel(currentMonth)}</span>
+          <span style={{ fontSize: 11, color: 'var(--ink3)', fontWeight: 600 }}>
+            {itemsSold.reduce((s, i) => s + i.qty, 0)} total units
+          </span>
+        </div>
+        {itemsSold.length === 0 ? (
+          <div style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--ink3)', fontSize: 13 }}>
+            No sales this month yet
+          </div>
+        ) : (
+          <div className="erp-table-scroll">
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'var(--bg)' }}>
+                  <th style={{ textAlign: 'left', padding: '9px 16px', fontSize: 10, fontWeight: 800, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Item</th>
+                  <th style={{ textAlign: 'right', padding: '9px 16px', fontSize: 10, fontWeight: 800, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Qty Sold</th>
+                  <th style={{ textAlign: 'right', padding: '9px 16px', fontSize: 10, fontWeight: 800, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {itemsSold.map((item, i) => (
+                  <tr
+                    key={item.name + i}
+                    style={{
+                      borderBottom: i < itemsSold.length - 1 ? '1px solid var(--border)' : 'none',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <td style={{ padding: '10px 16px', fontSize: 13, fontWeight: 600 }}>{item.name}</td>
+                    <td style={{ padding: '10px 16px', textAlign: 'right', fontFamily: "'JetBrains Mono',monospace", fontWeight: 800, fontSize: 14, color: 'var(--accent)' }}>{item.qty}</td>
+                    <td style={{ padding: '10px 16px', textAlign: 'right', fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, fontSize: 13 }}>{fmt(item.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--bg)' }}>
+                  <td style={{ padding: '10px 16px', fontSize: 13, fontWeight: 800 }}>Total</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', fontFamily: "'JetBrains Mono',monospace", fontWeight: 900, fontSize: 14, color: 'var(--accent)' }}>{itemsSold.reduce((s, i) => s + i.qty, 0)}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', fontFamily: "'JetBrains Mono',monospace", fontWeight: 900, fontSize: 14 }}>{fmt(itemsSold.reduce((s, i) => s + i.amount, 0))}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* ── RECENT BILLS ────────────────────────────────── */}

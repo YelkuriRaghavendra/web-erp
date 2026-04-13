@@ -527,6 +527,18 @@ export const syncBill = (bill: Bill) => {
   });
 };
 
+/** Delete a bill and its lines. bill_lines cascade on delete. */
+export const deleteBill = async (billId: string): Promise<void> => {
+  const { error } = await supabase.from('bills').delete().eq('bill_id', billId);
+  if (error) throw error;
+};
+
+/** Delete a purchase and its lines. purchase_lines cascade on delete. */
+export const deletePurchase = async (purchaseId: string): Promise<void> => {
+  const { error } = await supabase.from('purchases').delete().eq('purchase_id', purchaseId);
+  if (error) throw error;
+};
+
 export const syncPurchase = (po: Purchase) => {
   // Header must be committed before lines (FK constraint on purchase_id)
   void supabase.from('purchases').upsert({
@@ -660,6 +672,7 @@ export const syncItems = async (items: Item[]) => {
   }
 };
 
+/** Sync entire stock snapshot (used on bootstrap / bulk operations). */
 export const syncStock = (stock: Stock) => {
   const rows = Object.entries(stock).map(([item_id, s]) => ({
     item_id,
@@ -670,22 +683,36 @@ export const syncStock = (stock: Stock) => {
   if (rows.length) bg('upsert stock', supabase.from('stock').upsert(rows));
 };
 
-export const syncCustomer = (c: Customer) => {
-  bg(
-    'upsert customer',
-    supabase.from('customers').upsert({
-      customer_id: c.id,
-      name: c.name,
-      phone: c.phone,
-      address: c.address,
-      credit: c.credit,
-      outstanding: c.outstanding,
-      join_date: c.joinDate,
-      ledger: c.ledger ?? [],
+/** Sync only specific item stocks (avoids race condition on concurrent bills). */
+export const syncStockItems = (stock: Stock, itemIds: string[]) => {
+  const rows = itemIds
+    .filter(id => stock[id] !== undefined)
+    .map(id => ({
+      item_id: id,
+      qty: stock[id].qty,
       created_by: _currentUser,
       updated_by: _currentUser,
-    })
-  );
+    }));
+  if (rows.length) bg('upsert stock partial', supabase.from('stock').upsert(rows));
+};
+
+export const syncCustomer = async (c: Customer): Promise<void> => {
+  const { error } = await supabase.from('customers').upsert({
+    customer_id: c.id,
+    name: c.name,
+    phone: c.phone,
+    address: c.address,
+    credit: c.credit,
+    outstanding: c.outstanding,
+    join_date: c.joinDate,
+    ledger: c.ledger ?? [],
+    created_by: _currentUser,
+    updated_by: _currentUser,
+  });
+  if (error) {
+    console.warn('[Supabase sync] upsert customer:', error);
+    throw error;
+  }
 };
 
 export const syncTransaction = (t: Transaction) => {

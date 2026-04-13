@@ -12,6 +12,7 @@ const LOCKOUT_MS = 30_000; // 30 seconds
 export const LoginPage = ({ onLogin }: { onLogin: (u: ERPUser) => void }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPwd, setShowPwd] = useState(false);
   const [err, setErr] = useState('');
   const [lockSecs, setLockSecs] = useState(0);
   const [signing, setSigning] = useState(false); // loading state during DB query
@@ -176,13 +177,34 @@ export const LoginPage = ({ onLogin }: { onLogin: (u: ERPUser) => void }) => {
               onChange={setUsername}
               placeholder='Enter username'
             />
-            <Field
-              label='Password'
-              type='password'
-              value={password}
-              onChange={setPassword}
-              placeholder='Enter password'
-            />
+            <div style={{ position: 'relative' }}>
+              <Field
+                label='Password'
+                type={showPwd ? 'text' : 'password'}
+                value={password}
+                onChange={setPassword}
+                placeholder='Enter password'
+              />
+              <button
+                type='button'
+                onClick={() => setShowPwd(p => !p)}
+                style={{
+                  position: 'absolute',
+                  right: 12,
+                  top: 32,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: 16,
+                  color: 'var(--ink3)',
+                  padding: '4px',
+                  lineHeight: 1,
+                }}
+                tabIndex={-1}
+              >
+                {showPwd ? '🙈' : '👁'}
+              </button>
+            </div>
 
             {err && (
               <div

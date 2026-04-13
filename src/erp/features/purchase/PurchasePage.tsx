@@ -544,18 +544,20 @@ const PurchasesTable = ({
   selectedMonth,
   isAdmin,
   onEdit,
+  onDelete,
 }: {
   purchases: Purchase[];
   monthStats: { totalOrders: number; totalQty: number; totalSpend: number };
   selectedMonth: string;
   isAdmin: boolean;
   onEdit: (old: Purchase, updated: Purchase) => void;
+  onDelete: (po: Purchase) => void;
 }) => {
   const P_COLS = isAdmin
-    ? [...BASE_P_COLS, { key: null as PSortCol | null, label: '', align: 'left' as const }]
+    ? [...BASE_P_COLS, { key: null as PSortCol | null, label: '', align: 'left' as const }, { key: null as PSortCol | null, label: '', align: 'left' as const }]
     : BASE_P_COLS;
   const P_GRID = isAdmin
-    ? '40px 1fr 1fr 1fr 1fr 80px 1fr 40px 40px'
+    ? '40px 1fr 1fr 1fr 1fr 80px 1fr 40px 40px 40px'
     : '40px 1fr 1fr 1fr 1fr 80px 1fr 40px';
 
   const [search, setSearch] = useState('');
@@ -973,6 +975,20 @@ const PurchasesTable = ({
                     </button>
                   </div>
                 )}
+                {/* 🗑️ Delete icon — admin only */}
+                {isAdmin && (
+                  <div style={{ padding: '12px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <button
+                      onClick={() => { if (confirm(`Delete purchase ${po.id}?`)) onDelete(po); }}
+                      title='Delete purchase'
+                      style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: 7, cursor: 'pointer', padding: '4px 7px', fontSize: 14, lineHeight: 1, color: 'var(--ink3)', transition: 'all .15s', display: 'flex', alignItems: 'center' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.borderColor = 'var(--red)'; e.currentTarget.style.color = 'var(--red)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--ink3)'; }}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                )}
               </div>
             ))
           )}
@@ -1009,6 +1025,7 @@ export const PurchasePage = () => {
     monthStats,
     recordPurchase,
     updatePurchase,
+    removePurchase,
     resetForm,
   } = usePurchase();
 
@@ -1606,6 +1623,7 @@ export const PurchasePage = () => {
           selectedMonth={selectedMonth}
           isAdmin={isAdmin}
           onEdit={updatePurchase}
+          onDelete={removePurchase}
         />
       )}
     </div>

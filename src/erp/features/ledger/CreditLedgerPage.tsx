@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   Page,
   StatCard,
@@ -25,6 +26,11 @@ export const CreditLedgerPage = () => {
     addEntry,
     previewBalance,
   } = useLedger();
+
+  const reversedLedger = useMemo(
+    () => selectedCustomer ? [...(selectedCustomer.ledger ?? [])].reverse() : [],
+    [selectedCustomer]
+  );
 
   return (
     <Page
@@ -319,7 +325,7 @@ export const CreditLedgerPage = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {[...selectedCustomer.ledger].reverse().map((e, i, arr) => (
+                    {reversedLedger.map((e, i, arr) => (
                       <tr
                         key={e.id}
                         style={{

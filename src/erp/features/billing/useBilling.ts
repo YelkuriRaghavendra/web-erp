@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useERPStore } from '../../core/store';
 import { useToast } from '../../shared/hooks/useToast';
-import { syncBill, syncBillUpdate, syncCustomer, syncStock } from '../../core/supabase';
+import { syncBill, syncBillUpdate, deleteBill as dbDeleteBill, syncCustomer, syncStockItems } from '../../core/supabase';
 import { ym } from '../../core/constants';
 import type { Bill, BillLine } from '../../core/types';
 
@@ -241,6 +241,7 @@ export const useBilling = () => {
 
     setStock(p => {
       const updated = { ...p };
+      const affectedIds = new Set<string>();
       const qtyPerItem2: Record<string, number> = {};
       lines.forEach(l => {
         qtyPerItem2[l.itemId] = (qtyPerItem2[l.itemId] ?? 0) + l.qty;
@@ -248,21 +249,23 @@ export const useBilling = () => {
 
       for (const [itemId, totalQty] of Object.entries(qtyPerItem2)) {
         const item = items.find(i => i.id === itemId);
-        if (item?.itemType === 'service') continue; // no stock to deduct
+        if (item?.itemType === 'service') continue;
         if (item?.itemType === 'linked') {
           item.bundleComponents.forEach(comp => {
             const deductQty = totalQty * comp.qty;
             updated[comp.componentItemId] = {
               qty: Math.max(0, (updated[comp.componentItemId]?.qty ?? 0) - deductQty),
             };
+            affectedIds.add(comp.componentItemId);
           });
         } else {
           updated[itemId] = {
             qty: Math.max(0, (updated[itemId]?.qty ?? 0) - totalQty),
           };
+          affectedIds.add(itemId);
         }
       }
-      syncStock(updated);
+      syncStockItems(updated, [...affectedIds]);
       return updated;
     });
 
@@ -276,7 +279,8 @@ export const useBilling = () => {
             ledger.length > 0
               ? ledger[ledger.length - 1].balance
               : c.outstanding;
-          const newBalance = prevBal + total;
+          const billGrandTotal = total + totalDeposit; // include deposits
+          const newBalance = prevBal + billGrandTotal;
           const desc = lines.map(l => `${l.qty}× ${l.itemName}`).join(', ');
           const updated = {
             ...c,
@@ -288,13 +292,15 @@ export const useBilling = () => {
                 id: crypto.randomUUID(),
                 type: 'DEBIT' as const,
                 date,
-                amount: total,
+                amount: billGrandTotal,
                 description: `Bill ${id} — ${desc}`,
                 balance: newBalance,
               },
             ],
           };
-          syncCustomer(updated);
+          syncCustomer(updated).catch(() =>
+            showToast('Warning: customer ledger may not have synced', 'error')
+          );
           return updated;
         })
       );
@@ -323,10 +329,20 @@ export const useBilling = () => {
 
   // ── Update an existing bill (admin only) ─────────────────
   const updateBill = useCallback((oldBill: Bill, newBill: Bill) => {
-    setBills(prev => prev.map(b => b.id === newBill.id ? newBill : b));
+    // If date changed, regenerate invoice ID to avoid clashes
+    let updatedBill = newBill;
+    if (newBill.date !== oldBill.date) {
+      const dateStr = newBill.date.replace(/-/g, '').slice(2);
+      const existingOnDate = bills.filter(b => b.date === newBill.date && b.id !== oldBill.id);
+      const seq = existingOnDate.length + 1;
+      updatedBill = { ...newBill, id: `INV-${dateStr}-${String(seq).padStart(3, '0')}` };
+    }
+
+    setBills(prev => prev.map(b => b.id === oldBill.id ? updatedBill : b));
 
     setStock(prevStock => {
       const s = { ...prevStock };
+      const affectedIds = new Set<string>();
 
       const aggregateQty = (billLines: BillLine[]): Record<string, number> => {
         const map: Record<string, number> = {};
@@ -342,32 +358,81 @@ export const useBilling = () => {
         if (item?.itemType === 'linked') {
           item.bundleComponents.forEach(comp => {
             s[comp.componentItemId] = { qty: (s[comp.componentItemId]?.qty ?? 0) + qty * comp.qty };
+            affectedIds.add(comp.componentItemId);
           });
         } else {
           s[itemId] = { qty: (s[itemId]?.qty ?? 0) + qty };
+          affectedIds.add(itemId);
         }
       }
 
       // Deduct stock for new bill
-      const newQtyMap = aggregateQty(newBill.lines);
+      const newQtyMap = aggregateQty(updatedBill.lines);
       for (const [itemId, qty] of Object.entries(newQtyMap)) {
         const item = items.find(i => i.id === itemId);
         if (item?.itemType === 'service') continue;
         if (item?.itemType === 'linked') {
           item.bundleComponents.forEach(comp => {
             s[comp.componentItemId] = { qty: Math.max(0, (s[comp.componentItemId]?.qty ?? 0) - qty * comp.qty) };
+            affectedIds.add(comp.componentItemId);
           });
         } else {
           s[itemId] = { qty: Math.max(0, (s[itemId]?.qty ?? 0) - qty) };
+          affectedIds.add(itemId);
         }
       }
 
-      syncStock(s);
+      syncStockItems(s, [...affectedIds]);
       return s;
     });
 
-    syncBillUpdate(newBill);
-    showToast(`✓ Bill ${newBill.id} updated`, 'success');
+    // If ID changed (date was modified), delete old bill and sync new one
+    if (updatedBill.id !== oldBill.id) {
+      dbDeleteBill(oldBill.id).catch(() => {});
+      syncBill(updatedBill);
+    } else {
+      syncBillUpdate(updatedBill);
+    }
+    showToast(`✓ Bill ${updatedBill.id} updated`, 'success');
+  }, [items, bills, setBills, setStock, showToast]);
+
+  // ── Delete bill ─────────────────────────────────────────
+  const removeBill = useCallback(async (bill: Bill) => {
+    try {
+      await dbDeleteBill(bill.id);
+
+      // Remove from store
+      setBills(prev => prev.filter(b => b.id !== bill.id));
+
+      // Restore stock
+      setStock(prevStock => {
+        const s = { ...prevStock };
+        const affectedIds = new Set<string>();
+        const qtyMap: Record<string, number> = {};
+        bill.lines.forEach(l => { qtyMap[l.itemId] = (qtyMap[l.itemId] ?? 0) + l.qty; });
+
+        for (const [itemId, qty] of Object.entries(qtyMap)) {
+          const item = items.find(i => i.id === itemId);
+          if (item?.itemType === 'service') continue;
+          if (item?.itemType === 'linked') {
+            item.bundleComponents.forEach(comp => {
+              s[comp.componentItemId] = { qty: (s[comp.componentItemId]?.qty ?? 0) + qty * comp.qty };
+              affectedIds.add(comp.componentItemId);
+            });
+          } else {
+            s[itemId] = { qty: (s[itemId]?.qty ?? 0) + qty };
+            affectedIds.add(itemId);
+          }
+        }
+        syncStockItems(s, [...affectedIds]);
+        return s;
+      });
+
+      showToast(`✓ Bill ${bill.id} deleted`, 'success');
+    } catch (err) {
+      console.warn('[deleteBill]', err);
+      showToast('Failed to delete bill', 'error');
+    }
   }, [items, setBills, setStock, showToast]);
 
   return {
@@ -399,6 +464,7 @@ export const useBilling = () => {
     monthSummary,
     createBill,
     updateBill,
+    removeBill,
     resetForm,
   };
 };

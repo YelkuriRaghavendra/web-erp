@@ -580,6 +580,7 @@ const BillsTable = ({
   isAdmin,
   customers,
   onEdit,
+  onDelete,
 }: {
   bills: Bill[];
   monthSummary: MonthSummary;
@@ -587,12 +588,13 @@ const BillsTable = ({
   isAdmin: boolean;
   customers: Customer[];
   onEdit: (old: Bill, updated: Bill) => void;
+  onDelete: (bill: Bill) => void;
 }) => {
   const COLS = isAdmin
-    ? [...BASE_COLS, { key: null as SortCol | null, label: '', align: 'left' as const }]
+    ? [...BASE_COLS, { key: null as SortCol | null, label: '', align: 'left' as const }, { key: null as SortCol | null, label: '', align: 'left' as const }]
     : BASE_COLS;
   const GRID = isAdmin
-    ? '140px 130px 1fr 110px 130px 130px 48px 48px'
+    ? '140px 130px 1fr 110px 130px 130px 48px 48px 48px'
     : '140px 130px 1fr 110px 130px 130px 48px';
 
   const [search, setSearch] = useState('');
@@ -1010,6 +1012,20 @@ const BillsTable = ({
                     </button>
                   </div>
                 )}
+                {/* 🗑️ Delete icon — admin only */}
+                {isAdmin && (
+                  <div style={{ padding: '12px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <button
+                      onClick={() => { if (confirm(`Delete bill ${bill.id}?`)) onDelete(bill); }}
+                      title='Delete bill'
+                      style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: 7, cursor: 'pointer', padding: '4px 7px', fontSize: 14, lineHeight: 1, color: 'var(--ink3)', transition: 'all .15s', display: 'flex', alignItems: 'center' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.borderColor = 'var(--red)'; e.currentTarget.style.color = 'var(--red)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--ink3)'; }}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                )}
               </div>
             ))
           )}
@@ -1049,6 +1065,7 @@ export const BillingPage = () => {
     monthSummary,
     createBill,
     updateBill,
+    removeBill,
     resetForm,
   } = useBilling();
 
@@ -1846,6 +1863,7 @@ export const BillingPage = () => {
           isAdmin={isAdmin}
           customers={customers}
           onEdit={updateBill}
+          onDelete={removeBill}
         />
       )}
     </div>

@@ -80,7 +80,7 @@ export const useCustomers = () => {
           ...c,
           outstanding: Math.max(0, c.outstanding - +payAmt),
         };
-        syncCustomer(next);
+        syncCustomer(next).catch(() => showToast('Warning: payment may not have synced', 'error'));
         return next;
       });
       return updated;
