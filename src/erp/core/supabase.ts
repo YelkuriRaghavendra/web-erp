@@ -683,6 +683,55 @@ export const syncStock = (stock: Stock) => {
   if (rows.length) bg('upsert stock', supabase.from('stock').upsert(rows));
 };
 
+/**
+ * Recalculate stock from scratch using all purchases (+) and bills (−).
+ * Handles linked items by decomposing into bundle components.
+ * Syncs the corrected stock to both Zustand and Supabase.
+ */
+export const recalculateStock = (
+  items: Item[],
+  purchases: Purchase[],
+  bills: Bill[],
+): Stock => {
+  const s: Stock = {};
+
+  // Initialise every non-linked, non-service item to 0
+  items.forEach(i => {
+    if (i.itemType !== 'linked' && i.itemType !== 'service') {
+      s[i.id] = { qty: 0 };
+    }
+  });
+
+  // +  purchases add stock (purchases never contain linked/service items)
+  purchases.forEach(po =>
+    po.lines.forEach(l => {
+      s[l.itemId] = { qty: (s[l.itemId]?.qty ?? 0) + l.qty };
+    })
+  );
+
+  // −  bills deduct stock (linked items decompose into components)
+  bills.forEach(bill =>
+    bill.lines.forEach(l => {
+      const item = items.find(i => i.id === l.itemId);
+      if (!item || item.itemType === 'service') return;
+      if (item.itemType === 'linked') {
+        item.bundleComponents.forEach(comp => {
+          const compItem = items.find(i => i.id === comp.componentItemId);
+          if (compItem?.itemType === 'service') return;
+          s[comp.componentItemId] = {
+            qty: Math.max(0, (s[comp.componentItemId]?.qty ?? 0) - l.qty * comp.qty),
+          };
+        });
+      } else {
+        s[l.itemId] = { qty: Math.max(0, (s[l.itemId]?.qty ?? 0) - l.qty) };
+      }
+    })
+  );
+
+  syncStock(s);
+  return s;
+};
+
 /** Sync only specific item stocks (avoids race condition on concurrent bills). */
 export const syncStockItems = (stock: Stock, itemIds: string[]) => {
   const rows = itemIds

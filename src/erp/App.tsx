@@ -250,10 +250,9 @@ const GasERPInner = () => {
       setBootStatus('Running migrations…');
       await runMigrations();
 
-      setBootStatus('Loading items & stock…');
-      const [items, stock] = await Promise.all([fetchAllItems(), fetchStock()]);
+      setBootStatus('Loading items…');
+      const items = await fetchAllItems();
       if (items.length) setItems(items);
-      setStock(stock);
 
       setBootStatus('Loading customers…');
       const customers = await fetchCustomers();
@@ -266,6 +265,11 @@ const GasERPInner = () => {
       ]);
       if (bills.length) setBills(bills);
       if (purchases.length) setPurchases(purchases);
+
+      // Recalculate stock from purchases (+) and bills (−) to fix any drift
+      setBootStatus('Recalculating stock…');
+      const stock = recalculateStock(items, purchases, bills);
+      setStock(stock);
 
       setBootStatus('Loading accounts data…');
       const [transactions, openingBalances] = await Promise.all([

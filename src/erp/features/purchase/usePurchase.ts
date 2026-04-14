@@ -164,17 +164,17 @@ export const usePurchase = () => {
     // 1. Replace purchase in store
     setPurchases(prev => prev.map(p => p.id === newPO.id ? newPO : p));
 
-    // 2. Adjust stock: reverse old additions, apply new ones
+    // 2. Adjust stock by the delta between new and old quantities
     setStock(prevStock => {
       const s = { ...prevStock };
-      // Reverse old purchase stock additions
-      oldPO.lines.forEach(l => {
-        s[l.itemId] = { qty: Math.max(0, (s[l.itemId]?.qty ?? 0) - l.qty) };
-      });
-      // Apply new purchase stock additions
-      newPO.lines.forEach(l => {
-        s[l.itemId] = { qty: (s[l.itemId]?.qty ?? 0) + l.qty };
-      });
+      // Build delta map: newQty - oldQty per item
+      const delta: Record<string, number> = {};
+      oldPO.lines.forEach(l => { delta[l.itemId] = (delta[l.itemId] ?? 0) - l.qty; });
+      newPO.lines.forEach(l => { delta[l.itemId] = (delta[l.itemId] ?? 0) + l.qty; });
+      // Apply deltas
+      for (const [itemId, d] of Object.entries(delta)) {
+        s[itemId] = { qty: Math.max(0, (s[itemId]?.qty ?? 0) + d) };
+      }
       syncStock(s);
       return s;
     });
